@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage'
 import VendorsListPage from './pages/VendorsListPage'
 import VendorDetailPage from './pages/VendorDetailPage'
 import PendingProductsPage from './pages/PendingProductsPage'
+import ActiveProductsPage from './pages/ActiveProductsPage'
 import CommissionsPage from './pages/CommissionsPage'
 import SettlementsPage from './pages/SettlementsPage'
 import Toast from './components/ui/Toast'
@@ -20,6 +21,7 @@ function AppRoutes() {
           <Route path="/vendors" element={<VendorsListPage />} />
           <Route path="/vendors/:id" element={<VendorDetailPage />} />
           <Route path="/pending-products" element={<PendingProductsPage />} />
+          <Route path="/active-products" element={<ActiveProductsPage />} />
           <Route path="/commissions" element={<CommissionsPage />} />
           <Route path="/settlements" element={<SettlementsPage />} />
         </Routes>

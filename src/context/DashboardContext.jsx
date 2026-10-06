@@ -3,6 +3,7 @@ import {
   vendors as initialVendors,
   pendingProducts as initialProducts,
   settlements as initialSettlements,
+  activeProducts as initialActiveProducts,
 } from '../data/mockData'
 
 const DashboardContext = createContext(null)
@@ -11,6 +12,7 @@ export function DashboardProvider({ children }) {
   const [vendors, setVendors] = useState(initialVendors)
   const [products, setProducts] = useState(initialProducts)
   const [settlements, setSettlements] = useState(initialSettlements)
+  const [activeProducts, setActiveProducts] = useState(initialActiveProducts)
   const [toast, setToast] = useState(null)
 
   const showToast = useCallback((type, message) => {
@@ -138,9 +140,42 @@ export function DashboardProvider({ children }) {
     [vendors, settlements.length, showToast]
   )
 
+  // Delete an active product (remove from listing)
+  const deleteActiveProduct = useCallback(
+    (productId) => {
+      const product = activeProducts.find((p) => p.id === productId)
+      setActiveProducts((prev) => prev.filter((p) => p.id !== productId))
+      if (product) {
+        setVendors((prev) =>
+          prev.map((v) =>
+            v.id === product.vendorId
+              ? { ...v, totalProducts: Math.max(0, v.totalProducts - 1) }
+              : v
+          )
+        )
+      }
+      showToast('success', 'تم حذف المنتج من القائمة بنجاح')
+    },
+    [activeProducts, showToast]
+  )
+
+  // Keep an active product for display (mark as kept)
+  const keepActiveProduct = useCallback(
+    (productId) => {
+      setActiveProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId ? { ...p, kept: true } : p
+        )
+      )
+      showToast('success', 'تم الإبقاء على المنتج للعرض')
+    },
+    [showToast]
+  )
+
   const value = {
     vendors,
     products,
+    activeProducts,
     settlements,
     toast,
     showToast,
@@ -150,6 +185,8 @@ export function DashboardProvider({ children }) {
     updateCommission,
     updateVendorStatus,
     createSettlement,
+    deleteActiveProduct,
+    keepActiveProduct,
   }
 
   return (
