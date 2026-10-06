@@ -98,11 +98,17 @@ jobs:
           KEYSTORE_VALUE="$ANDROID_KEYSTORE_BASE64"
           if [[ "$KEYSTORE_VALUE" == *ANDROID_KEYSTORE_BASE64=* ]]; then
             KEYSTORE_VALUE="${KEYSTORE_VALUE#*ANDROID_KEYSTORE_BASE64=}"
-            KEYSTORE_VALUE="${KEYSTORE_VALUE%%$'\n'*}"
+            if [[ "$KEYSTORE_VALUE" == *$'\n'ANDROID_KEYSTORE_PASSWORD=* ]]; then
+              KEYSTORE_VALUE="${KEYSTORE_VALUE%%$'\n'ANDROID_KEYSTORE_PASSWORD=*}"
+            fi
           fi
           KEYSTORE_VALUE="${KEYSTORE_VALUE//\"/}"
           KEYSTORE_VALUE="${KEYSTORE_VALUE//\'/}"
-          printf '%s' "$KEYSTORE_VALUE" | tr -cd 'A-Za-z0-9+/=' | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          KEYSTORE_VALUE="$(printf '%s' "$KEYSTORE_VALUE" | tr -cd 'A-Za-z0-9+/=')"
+          REMAINDER=$(( ${#KEYSTORE_VALUE} % 4 ))
+          if [[ "$REMAINDER" == 2 ]]; then KEYSTORE_VALUE="${KEYSTORE_VALUE}=="; fi
+          if [[ "$REMAINDER" == 3 ]]; then KEYSTORE_VALUE="${KEYSTORE_VALUE}="; fi
+          printf '%s' "$KEYSTORE_VALUE" | base64 --decode --ignore-garbage > "$ANDROID_KEYSTORE_PATH"
           test -s "$ANDROID_KEYSTORE_PATH"
 
       - name: Configure Android signing
@@ -124,6 +130,7 @@ jobs:
           keyAlias=$KEY_ALIAS
           keyPassword=$KEY_PASSWORD
           EOF
+          keytool -list -keystore "$ANDROID_KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
 
       - name: Set Android version
         env:
