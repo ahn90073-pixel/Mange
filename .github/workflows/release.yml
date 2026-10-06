@@ -118,9 +118,17 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          STORE_PASSWORD="${ANDROID_KEYSTORE_PASSWORD#ANDROID_KEYSTORE_PASSWORD=}"
-          KEY_ALIAS="${ANDROID_KEY_ALIAS#ANDROID_KEY_ALIAS=}"
-          KEY_PASSWORD="${ANDROID_KEY_PASSWORD#ANDROID_KEY_PASSWORD=}"
+          clean_secret() {
+            local value="$1"
+            if [[ "$value" == *=* ]]; then value="${value#*=}"; fi
+            value="${value%%$'\n'*}"
+            value="${value//\"/}"
+            value="${value//\'/}"
+            printf '%s' "$value" | tr -d '[:space:]'
+          }
+          STORE_PASSWORD="$(clean_secret "$ANDROID_KEYSTORE_PASSWORD")"
+          KEY_ALIAS="$(clean_secret "$ANDROID_KEY_ALIAS")"
+          KEY_PASSWORD="$(clean_secret "$ANDROID_KEY_PASSWORD")"
           test -n "$STORE_PASSWORD"
           test -n "$KEY_ALIAS"
           test -n "$KEY_PASSWORD"
