@@ -95,8 +95,14 @@ jobs:
             echo "Missing ANDROID_KEYSTORE_BASE64 repository secret." >&2
             exit 1
           }
-          KEYSTORE_VALUE="${ANDROID_KEYSTORE_BASE64#ANDROID_KEYSTORE_BASE64=}"
-          printf '%s' "$KEYSTORE_VALUE" | tr -d '[:space:]' | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          KEYSTORE_VALUE="$ANDROID_KEYSTORE_BASE64"
+          if [[ "$KEYSTORE_VALUE" == *ANDROID_KEYSTORE_BASE64=* ]]; then
+            KEYSTORE_VALUE="${KEYSTORE_VALUE#*ANDROID_KEYSTORE_BASE64=}"
+            KEYSTORE_VALUE="${KEYSTORE_VALUE%%$'\n'*}"
+          fi
+          KEYSTORE_VALUE="${KEYSTORE_VALUE//\"/}"
+          KEYSTORE_VALUE="${KEYSTORE_VALUE//\'/}"
+          printf '%s' "$KEYSTORE_VALUE" | tr -cd 'A-Za-z0-9+/=' | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           test -s "$ANDROID_KEYSTORE_PATH"
 
       - name: Configure Android signing
