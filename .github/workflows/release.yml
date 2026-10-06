@@ -138,7 +138,11 @@ jobs:
           keyAlias=$KEY_ALIAS
           keyPassword=$KEY_PASSWORD
           EOF
-          keytool -list -keystore "$ANDROID_KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          if ! keytool -list -keystore "$ANDROID_KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /tmp/keytool-check.log 2>&1; then
+            echo "Android keystore validation failed. Check the four Android secrets and ensure each contains only its value."
+            sed -E 's/(password|Password|PASS|alias|Alias)[^:]*:.*/\1: [redacted]/' /tmp/keytool-check.log || true
+            exit 1
+          fi
 
       - name: Set Android version
         env:
