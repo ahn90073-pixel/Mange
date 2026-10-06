@@ -95,7 +95,8 @@ jobs:
             echo "Missing ANDROID_KEYSTORE_BASE64 repository secret." >&2
             exit 1
           }
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          KEYSTORE_VALUE="${ANDROID_KEYSTORE_BASE64#ANDROID_KEYSTORE_BASE64=}"
+          printf '%s' "$KEYSTORE_VALUE" | tr -d '[:space:]' | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           test -s "$ANDROID_KEYSTORE_PATH"
 
       - name: Configure Android signing
@@ -105,14 +106,17 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
+          STORE_PASSWORD="${ANDROID_KEYSTORE_PASSWORD#ANDROID_KEYSTORE_PASSWORD=}"
+          KEY_ALIAS="${ANDROID_KEY_ALIAS#ANDROID_KEY_ALIAS=}"
+          KEY_PASSWORD="${ANDROID_KEY_PASSWORD#ANDROID_KEY_PASSWORD=}"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
           cat > android/keystore.properties <<EOF
           storeFile=mange-release.jks
-          storePassword=$ANDROID_KEYSTORE_PASSWORD
-          keyAlias=$ANDROID_KEY_ALIAS
-          keyPassword=$ANDROID_KEY_PASSWORD
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
           EOF
 
       - name: Set Android version
