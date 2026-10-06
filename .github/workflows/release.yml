@@ -95,12 +95,10 @@ jobs:
             echo "Missing ANDROID_KEYSTORE_BASE64 repository secret." >&2
             exit 1
           }
-          KEYSTORE_VALUE="$ANDROID_KEYSTORE_BASE64"
+          KEYSTORE_VALUE="${ANDROID_KEYSTORE_BASE64//$'\r'/}"
           if [[ "$KEYSTORE_VALUE" == *ANDROID_KEYSTORE_BASE64=* ]]; then
             KEYSTORE_VALUE="${KEYSTORE_VALUE#*ANDROID_KEYSTORE_BASE64=}"
-            if [[ "$KEYSTORE_VALUE" == *$'\n'ANDROID_KEYSTORE_PASSWORD=* ]]; then
-              KEYSTORE_VALUE="${KEYSTORE_VALUE%%$'\n'ANDROID_KEYSTORE_PASSWORD=*}"
-            fi
+            KEYSTORE_VALUE="${KEYSTORE_VALUE%%$'\n'ANDROID_KEYSTORE_PASSWORD=*}"
           fi
           KEYSTORE_VALUE="${KEYSTORE_VALUE//\"/}"
           KEYSTORE_VALUE="${KEYSTORE_VALUE//\'/}"
