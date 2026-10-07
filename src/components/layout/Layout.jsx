@@ -4,7 +4,7 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 
 const pageMeta = {
-  '/': { title: 'لوحة المعلومات', subtitle: 'نظرة عامة على أداء المنصة' },
+  '/': { title: 'لوحة التحكم', subtitle: 'نظرة عامة على أداء المنصة' },
   '/vendors': { title: 'إدارة التجار', subtitle: 'قائمة بجميع التجار المسجلين في النظام' },
   '/pending-products': {
     title: 'مراجعة المنتجات',
