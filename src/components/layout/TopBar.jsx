@@ -8,6 +8,7 @@ export default function TopBar({ onMenuClick, title, subtitle }) {
   const [otaResult, setOtaResult] = useState(null)
   const [checkingOta, setCheckingOta] = useState(false)
   const isAndroid = Capacitor.getPlatform() === 'android'
+  const isDashboardTitle = title === 'لوحة التحكم'
 
   const handleOtaCheck = async () => {
     setCheckingOta(true)
@@ -49,7 +50,9 @@ export default function TopBar({ onMenuClick, title, subtitle }) {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.8)]" />
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-bold text-white drop-shadow-sm">
+            <h2
+              className={`inline-block max-w-full truncate rounded-md px-2 py-0.5 text-lg font-bold drop-shadow-sm ${isDashboardTitle ? 'bg-sky-400/20 text-sky-200 ring-1 ring-sky-300/35' : 'text-white'}`}
+            >
               {title}
             </h2>
             {subtitle && (
