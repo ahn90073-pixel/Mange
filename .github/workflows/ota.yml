@@ -1,0 +1,68 @@
+name: Deploy Android OTA bundle
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-ota-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and publish web bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure deployment is from main
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "OTA bundles can only be published from main." >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: Install dependencies and build web app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package web bundle
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          (cd dist && zip -q -r "$RUNNER_TEMP/dist.zip" .)
+          unzip -Z1 "$RUNNER_TEMP/dist.zip" | grep -qx 'index.html'
+
+      - name: Create or replace the latest OTA bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          OTA_TAG='ota-latest'
+          if gh release view "$OTA_TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$OTA_TAG" "$RUNNER_TEMP/dist.zip" \
+              --repo "$REPOSITORY" \
+              --clobber
+          else
+            gh release create "$OTA_TAG" "$RUNNER_TEMP/dist.zip" \
+              --repo "$REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --prerelease \
+              --title 'Mange Android OTA' \
+              --notes 'Latest web-only update bundle. Published automatically from main by GitHub Actions.'
+          fi
+          gh release view "$OTA_TAG" --repo "$REPOSITORY"

@@ -1,5 +1,11 @@
 {
   "appId": "com.ahn90073.mange",
   "appName": "Mange",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "statsUrl": ""
+    }
+  }
 }
