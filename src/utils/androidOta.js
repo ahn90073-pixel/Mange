@@ -39,10 +39,7 @@ async function checkForAndroidUpdate() {
   checkInFlight = (async () => {
     try {
       const response = await fetch(OTA_RELEASE_API, {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
+        headers: { Accept: 'application/vnd.github+json' },
         cache: 'no-store',
       })
 
