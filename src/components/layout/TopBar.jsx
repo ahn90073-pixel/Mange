@@ -1,9 +1,40 @@
-import { Menu, Bell, Search } from 'lucide-react'
+import { useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Menu, Bell, Search, RefreshCw, X } from 'lucide-react'
 import { adminInfo } from '../../data/mockData'
+import { checkAndroidOtaNow } from '../../utils/androidOta'
 
 export default function TopBar({ onMenuClick, title, subtitle }) {
+  const [otaResult, setOtaResult] = useState(null)
+  const [checkingOta, setCheckingOta] = useState(false)
+  const isAndroid = Capacitor.getPlatform() === 'android'
+
+  const handleOtaCheck = async () => {
+    setCheckingOta(true)
+    setOtaResult({ status: 'checking', message: 'جارٍ فحص GitHub والتحديث...' })
+    try {
+      setOtaResult(await checkAndroidOtaNow())
+    } catch (error) {
+      setOtaResult({
+        status: 'error',
+        message: 'تعذر تشغيل فحص التحديث.',
+        details: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setCheckingOta(false)
+    }
+  }
+
+  const panelTone = ['downloaded', 'pending', 'up-to-date'].includes(otaResult?.status)
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+    : ['checking'].includes(otaResult?.status)
+      ? 'border-sky-200 bg-sky-50 text-sky-950'
+      : ['release-missing', 'asset-missing', 'recent-check', 'retry-wait'].includes(otaResult?.status)
+        ? 'border-amber-200 bg-amber-50 text-amber-950'
+        : 'border-rose-200 bg-rose-50 text-rose-950'
+
   return (
-    <header className="sticky top-0 z-20 overflow-hidden border-b border-amber-300/40 bg-gradient-to-l from-[#102b4a] via-[#183e66] to-[#102b4a] text-white shadow-lg">
+    <header className="sticky top-0 z-20 border-b border-amber-300/40 bg-gradient-to-l from-[#102b4a] via-[#183e66] to-[#102b4a] text-white shadow-lg">
       <div className="flex items-center justify-between gap-4 px-4 py-4 lg:px-8">
         {/* Mobile menu button */}
         <button
@@ -41,9 +72,60 @@ export default function TopBar({ onMenuClick, title, subtitle }) {
           />
         </div>
 
-        {/* Notifications + Admin */}
-        <div className="flex items-center gap-3">
+        {/* OTA diagnostics + notifications + admin */}
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {isAndroid && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={handleOtaCheck}
+                disabled={checkingOta}
+                title="فحص وتشخيص تحديث التطبيق"
+                aria-label="فحص وتشخيص تحديث OTA"
+                className="flex items-center gap-1.5 rounded-lg border border-amber-200/40 bg-white/10 px-2.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-wait disabled:opacity-75 sm:px-3 sm:text-sm"
+              >
+                <RefreshCw size={15} className={checkingOta ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">فحص التحديث</span>
+              </button>
+
+              {otaResult && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`absolute left-0 top-full z-50 mt-3 w-[min(88vw,22rem)] rounded-xl border p-4 shadow-2xl ${panelTone}`}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-sm font-bold">تشخيص تحديث OTA</p>
+                    <button
+                      type="button"
+                      onClick={() => setOtaResult(null)}
+                      aria-label="إغلاق التشخيص"
+                      className="rounded-md p-1 opacity-70 hover:bg-black/5 hover:opacity-100"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <p className="text-sm leading-6">{otaResult.message}</p>
+                  {otaResult.details && (
+                    <p dir="rtl" className="mt-2 break-words rounded-lg bg-white/70 p-2 text-xs leading-5 opacity-85">
+                      {otaResult.details}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleOtaCheck}
+                    disabled={checkingOta}
+                    className="mt-3 rounded-lg bg-[#102b4a] px-3 py-2 text-xs font-semibold text-white hover:bg-[#183e66] disabled:opacity-60"
+                  >
+                    إعادة الفحص الآن
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <button
+            type="button"
             aria-label="الإشعارات"
             className="relative rounded-xl p-2.5 text-white/85 transition-colors hover:bg-white/10 hover:text-white"
           >

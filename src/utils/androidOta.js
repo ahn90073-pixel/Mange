@@ -27,13 +27,30 @@ function setStoredTime(key, value) {
   }
 }
 
-async function checkForAndroidUpdate() {
-  if (Capacitor.getPlatform() !== 'android') return
+function diagnostic(status, message, details = '') {
+  return { status, message, details }
+}
+
+async function checkForAndroidUpdate({ force = false } = {}) {
+  if (Capacitor.getPlatform() !== 'android') {
+    return diagnostic('unsupported', 'فحص OTA متاح داخل تطبيق Android فقط.')
+  }
+  if (!Capacitor.isPluginAvailable('CapacitorUpdater')) {
+    return diagnostic(
+      'plugin-missing',
+      'إضافة التحديث غير موجودة في هذه النسخة.',
+      'ثبّت أحدث APK يتضمن إضافة OTA ثم أعد الفحص.',
+    )
+  }
   if (checkInFlight) return checkInFlight
 
   const now = Date.now()
-  if (now - getStoredTime(SUCCESSFUL_CHECK_KEY) < CHECK_INTERVAL_MS) return
-  if (now - getStoredTime(LAST_ATTEMPT_KEY) < RETRY_INTERVAL_MS) return
+  if (!force && now - getStoredTime(SUCCESSFUL_CHECK_KEY) < CHECK_INTERVAL_MS) {
+    return diagnostic('recent-check', 'تم فحص التحديث مؤخرًا.', 'استخدم زر الفحص اليدوي لتجاوز المهلة.')
+  }
+  if (!force && now - getStoredTime(LAST_ATTEMPT_KEY) < RETRY_INTERVAL_MS) {
+    return diagnostic('retry-wait', 'تعذّر الفحص منذ وقت قصير.', 'انتظر دقيقتين ثم أعد المحاولة.')
+  }
 
   setStoredTime(LAST_ATTEMPT_KEY, now)
   checkInFlight = (async () => {
@@ -45,24 +62,61 @@ async function checkForAndroidUpdate() {
 
       if (response.status === 404) {
         setStoredTime(SUCCESSFUL_CHECK_KEY, Date.now())
-        return
+        return diagnostic(
+          'release-missing',
+          'لم أجد إصدار OTA على GitHub.',
+          'لم يتم العثور على الوسم ota-latest (HTTP 404).',
+        )
       }
-      if (!response.ok) throw new Error(`GitHub release check failed (${response.status})`)
+      if (!response.ok) {
+        const remaining = response.headers.get('x-ratelimit-remaining')
+        const detail = response.status === 403
+          ? `GitHub رفض الطلب (HTTP 403). المتبقي من طلبات API: ${remaining ?? 'غير معروف'}.`
+          : `استجابة GitHub: HTTP ${response.status}.`
+        return diagnostic('github-error', 'تعذر قراءة إصدار OTA من GitHub.', detail)
+      }
 
       const release = await response.json()
-      if (release.tag_name !== 'ota-latest' || release.draft || !release.prerelease) return
+      if (release.tag_name !== 'ota-latest' || release.draft || !release.prerelease) {
+        return diagnostic(
+          'release-invalid',
+          'وصلت إلى GitHub لكن الإصدار ليس إصدار OTA صالحًا.',
+          `الوسم المستلم: ${release.tag_name ?? 'غير معروف'}؛ تجريبي: ${Boolean(release.prerelease)}.`,
+        )
+      }
 
       const asset = release.assets?.find(
         (candidate) => candidate.name === OTA_ASSET_NAME && candidate.state === 'uploaded',
       )
-      if (!asset?.browser_download_url || !asset.id) return
+      if (!asset?.browser_download_url || !asset.id) {
+        const names = release.assets?.map((candidate) => candidate.name).join(', ') || 'لا توجد ملفات'
+        return diagnostic(
+          'asset-missing',
+          'إصدار OTA موجود، لكن ملف التحديث dist.zip غير موجود أو لم يكتمل رفعه.',
+          `الملفات المتاحة: ${names}.`,
+        )
+      }
 
       const version = String(asset.id)
       const { bundle: current } = await CapacitorUpdater.current()
       const pending = await CapacitorUpdater.getNextBundle()
-      if (current?.version === version || pending?.version === version) {
+      const currentVersion = current?.version ?? 'غير معروف'
+
+      if (currentVersion === version) {
         setStoredTime(SUCCESSFUL_CHECK_KEY, Date.now())
-        return
+        return diagnostic(
+          'up-to-date',
+          'التطبيق يستخدم أحدث حزمة OTA.',
+          `الحزمة الحالية وآخر حزمة على GitHub: ${version}.`,
+        )
+      }
+      if (pending?.version === version) {
+        setStoredTime(SUCCESSFUL_CHECK_KEY, Date.now())
+        return diagnostic(
+          'pending',
+          'التحديث منزّل ومجدول بالفعل.',
+          `أغلق التطبيق وافتحه مجددًا لتطبيق الحزمة ${version}.`,
+        )
       }
 
       const digest = typeof asset.digest === 'string' ? asset.digest.replace(/^sha256:/, '') : undefined
@@ -73,14 +127,26 @@ async function checkForAndroidUpdate() {
       })
       await CapacitorUpdater.next({ id: downloaded.id })
       setStoredTime(SUCCESSFUL_CHECK_KEY, Date.now())
+      const size = `${(asset.size / (1024 * 1024)).toFixed(2)} MB`
+      return diagnostic(
+        'downloaded',
+        'تم تنزيل تحديث الواجهة وجدولته بنجاح.',
+        `رقم الحزمة: ${version}؛ حجمها: ${size}. أغلق التطبيق وافتحه مجددًا لتطبيقها.`,
+      )
     } catch (error) {
-      console.warn('[OTA] Could not check or download the GitHub update.', error)
+      const details = error instanceof Error ? error.message : String(error)
+      console.warn('[OTA] Diagnostic check failed.', error)
+      return diagnostic('error', 'فشل فحص أو تنزيل تحديث OTA.', details || 'خطأ غير معروف.')
     } finally {
       checkInFlight = undefined
     }
   })()
 
   return checkInFlight
+}
+
+export function checkAndroidOtaNow() {
+  return checkForAndroidUpdate({ force: true })
 }
 
 export function initializeAndroidOta() {
