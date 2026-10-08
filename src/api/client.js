@@ -58,6 +58,12 @@ function pageQuery(page, limit = 100, extra = {}) {
 
 export const adminApi = {
   dashboard: () => request('/dashboard'),
+  orders: (page = 1, limit = 100, status = 'all', q = '') => request(`/orders${pageQuery(page, limit, { status, q })}`),
+  order: (vendorId, orderId) => request(`/orders/${encodeURIComponent(vendorId)}/${encodeURIComponent(orderId)}`),
+  updateOrder: (vendorId, orderId, update) => request(
+    `/orders/${encodeURIComponent(vendorId)}/${encodeURIComponent(orderId)}`,
+    { method: 'PATCH', body: update },
+  ),
   vendors: (page = 1, limit = 100) => request(`/vendors${pageQuery(page, limit)}`),
   vendor: (id) => request(`/vendors/${encodeURIComponent(id)}`),
   products: (page = 1, limit = 100) => request(`/products${pageQuery(page, limit, { status: 'all' })}`),

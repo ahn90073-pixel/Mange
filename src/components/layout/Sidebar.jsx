@@ -6,12 +6,14 @@ import {
   PackageX,
   Percent,
   Receipt,
+  ShoppingBag,
   X,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true },
   { to: '/vendors', label: 'إدارة التجار', icon: Store },
+  { to: '/orders', label: 'طلبات المتجر', icon: ShoppingBag },
   { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck },
   { to: '/active-products', label: 'منتجات قديمة', icon: PackageX },
   { to: '/commissions', label: 'إدارة العمولات', icon: Percent },

@@ -12,6 +12,7 @@ export const orderStatusMap = {
   confirmed: { label: 'مؤكد', class: 'badge-primary' },
   pending: { label: 'بانتظار التأكيد', class: 'badge-warning' },
   cancelled: { label: 'ملغي', class: 'badge-danger' },
+  returned: { label: 'مرتجع', class: 'badge-neutral' },
   refunded: { label: 'مسترد', class: 'badge-neutral' },
 }
 
