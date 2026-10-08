@@ -6,7 +6,6 @@ import {
   PackageX,
   Percent,
   Receipt,
-  LogOut,
   X,
 } from 'lucide-react'
 
@@ -19,7 +18,7 @@ const navItems = [
   { to: '/settlements', label: 'السدادات المالية', icon: Receipt },
 ]
 
-export default function Sidebar({ open, onClose, user, onLogout }) {
+export default function Sidebar({ open, onClose }) {
   return (
     <>
       {/* Mobile overlay */}
@@ -94,15 +93,12 @@ export default function Sidebar({ open, onClose, user, onLogout }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">
-                {user?.fullName || user?.email || 'مدير المنصة'}
+                إدارة المنصة
               </p>
               <p className="text-neutral-400 text-xs truncate">
-                مدير المنصة
+                وصول عام بلا تسجيل دخول
               </p>
             </div>
-            <button onClick={onLogout} aria-label="تسجيل الخروج" title="تسجيل الخروج" className="text-neutral-400 hover:text-danger-500 transition-colors p-1">
-              <LogOut size={18} />
-            </button>
           </div>
         </div>
       </aside>

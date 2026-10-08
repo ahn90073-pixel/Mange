@@ -24,7 +24,7 @@ const pageMeta = {
   },
 }
 
-export default function Layout({ children, user, onLogout }) {
+export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
 
@@ -35,14 +35,13 @@ export default function Layout({ children, user, onLogout }) {
 
   return (
     <div className="flex min-h-screen bg-neutral-50">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} onLogout={onLogout} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar
           onMenuClick={() => setSidebarOpen(true)}
           title={meta.title}
           subtitle={meta.subtitle}
-          user={user}
         />
         <main className="flex-1 p-4 lg:p-8 animate-fade-in">{children}</main>
       </div>

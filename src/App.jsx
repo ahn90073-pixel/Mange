@@ -1,5 +1,5 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { LoaderCircle, RefreshCw, LogOut } from 'lucide-react'
+import { LoaderCircle, RefreshCw } from 'lucide-react'
 import Layout from './components/layout/Layout'
 import { DashboardProvider, useDashboard } from './context/DashboardContext'
 import DashboardPage from './pages/DashboardPage'
@@ -9,7 +9,6 @@ import PendingProductsPage from './pages/PendingProductsPage'
 import ActiveProductsPage from './pages/ActiveProductsPage'
 import CommissionsPage from './pages/CommissionsPage'
 import SettlementsPage from './pages/SettlementsPage'
-import LoginPage from './pages/LoginPage'
 import Toast from './components/ui/Toast'
 
 function LoadingScreen({ label }) {
@@ -23,54 +22,33 @@ function LoadingScreen({ label }) {
   )
 }
 
-function LoadFailure({ error, onRetry, onLogout }) {
+function LoadFailure({ error, onRetry }) {
   return (
     <main dir="rtl" className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <section className="w-full max-w-lg rounded-2xl border border-neutral-200 bg-white p-7 text-center shadow-card">
         <h1 className="text-lg font-bold text-neutral-900">تعذر تحميل بيانات الإدارة</h1>
         <p role="alert" className="mt-3 text-sm leading-6 text-neutral-600">{error}</p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button type="button" onClick={onRetry} className="btn-primary">
-            <RefreshCw size={16} /> إعادة المحاولة
-          </button>
-          <button type="button" onClick={onLogout} className="btn-secondary">
-            <LogOut size={16} /> تسجيل الخروج
-          </button>
-        </div>
+        <button type="button" onClick={onRetry} className="btn-primary mt-6">
+          <RefreshCw size={16} /> إعادة المحاولة
+        </button>
       </section>
     </main>
   )
 }
 
 function AppRoutes() {
-  const {
-    toast,
-    hideToast,
-    authInitializing,
-    authMessage,
-    user,
-    login,
-    logout,
-    loading,
-    dataReady,
-    loadError,
-    refresh,
-  } = useDashboard()
+  const { toast, hideToast, loading, dataReady, loadError, refresh } = useDashboard()
 
   let content
-  if (authInitializing) {
-    content = <LoadingScreen label="جارٍ التحقق من جلسة الإدارة..." />
-  } else if (!user) {
-    content = <LoginPage key={authMessage} onLogin={login} message={authMessage} />
-  } else if (!dataReady && loading) {
+  if (!dataReady && loading) {
     content = <LoadingScreen label="جارٍ تحميل بيانات لوحة الإدارة..." />
   } else if (!dataReady && loadError) {
-    content = <LoadFailure error={loadError} onRetry={refresh} onLogout={logout} />
+    content = <LoadFailure error={loadError} onRetry={refresh} />
   } else if (!dataReady) {
     content = <LoadingScreen label="جارٍ تجهيز لوحة الإدارة..." />
   } else {
     content = (
-      <Layout user={user} onLogout={logout}>
+      <Layout>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/vendors" element={<VendorsListPage />} />

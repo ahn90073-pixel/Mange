@@ -1,13 +1,7 @@
 const DEFAULT_API_BASE = 'https://mangerbackend.ahn90073.workers.dev/api/admin'
 const API_BASE = (import.meta.env.VITE_ADMIN_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
-const TOKEN_KEY = 'mange.admin.token'
 
 const localizedErrors = {
-  'Invalid email or password.': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
-  'This account is not a platform administrator.': 'هذا الحساب غير مخوّل لإدارة المنصة.',
-  'Authentication service is not configured.': 'خدمة تسجيل الدخول غير مهيأة حالياً، يرجى التواصل مع مسؤول النظام.',
-  'Invalid or expired token.': 'انتهت صلاحية الجلسة؛ سجّل الدخول مجدداً.',
-  'Invalid or expired token': 'انتهت صلاحية الجلسة؛ سجّل الدخول مجدداً.',
   'Internal server error': 'حدث خطأ داخلي في الخادم. حاول مرة أخرى.',
   'Internal server error.': 'حدث خطأ داخلي في الخادم. حاول مرة أخرى.',
 }
@@ -20,42 +14,19 @@ export class ApiError extends Error {
   }
 }
 
-export function getAdminToken() {
-  try {
-    return window.localStorage.getItem(TOKEN_KEY)
-  } catch {
-    return null
-  }
-}
-
-export function saveAdminToken(token) {
-  window.localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearAdminToken() {
-  try {
-    window.localStorage.removeItem(TOKEN_KEY)
-  } catch {
-    // Storage may be unavailable in a restricted browser context.
-  }
-}
-
 function apiMessage(payload, status) {
   const message = payload?.message || payload?.error || ''
   if (localizedErrors[message]) return localizedErrors[message]
-  if (status === 401) return 'انتهت صلاحية الجلسة أو بيانات الدخول غير صحيحة.'
-  if (status === 403) return 'هذا الحساب غير مخوّل لتنفيذ هذا الإجراء.'
   if (status === 404) return 'العنصر المطلوب غير موجود.'
   if (status >= 500) return 'تعذر إكمال الطلب بسبب مشكلة في الخادم.'
   return message || 'تعذر إكمال الطلب.'
 }
 
-async function request(path, { token = getAdminToken(), method = 'GET', body } = {}) {
+async function request(path, { method = 'GET', body } = {}) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 25000)
   const headers = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  if (token) headers.Authorization = `Bearer ${token}`
 
   try {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -86,41 +57,34 @@ function pageQuery(page, limit = 100, extra = {}) {
 }
 
 export const adminApi = {
-  login: (email, password) => request('/auth/login', {
-    token: null,
-    method: 'POST',
-    body: { email, password },
-  }),
-  me: (token) => request('/auth/me', { token }),
-  dashboard: (token) => request('/dashboard', { token }),
-  vendors: (token, page = 1, limit = 100) => request(`/vendors${pageQuery(page, limit)}`, { token }),
-  vendor: (token, id) => request(`/vendors/${encodeURIComponent(id)}`, { token }),
-  products: (token, page = 1, limit = 100) => request(`/products${pageQuery(page, limit, { status: 'all' })}`, { token }),
-  activeProducts: (token, page = 1, limit = 100) => request(`/products/active${pageQuery(page, limit, { olderThanDays: '30' })}`, { token }),
-  settlements: (token, page = 1, limit = 100) => request(`/settlements${pageQuery(page, limit, { status: 'all' })}`, { token }),
-  reviewProduct: (token, vendorId, productId, decision, reason) => request(
+  dashboard: () => request('/dashboard'),
+  vendors: (page = 1, limit = 100) => request(`/vendors${pageQuery(page, limit)}`),
+  vendor: (id) => request(`/vendors/${encodeURIComponent(id)}`),
+  products: (page = 1, limit = 100) => request(`/products${pageQuery(page, limit, { status: 'all' })}`),
+  activeProducts: (page = 1, limit = 100) => request(`/products/active${pageQuery(page, limit, { olderThanDays: '30' })}`),
+  settlements: (page = 1, limit = 100) => request(`/settlements${pageQuery(page, limit, { status: 'all' })}`),
+  reviewProduct: (vendorId, productId, decision, reason) => request(
     `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}/review`,
-    { token, method: 'PATCH', body: { decision, ...(reason ? { reason } : {}) } },
+    { method: 'PATCH', body: { decision, ...(reason ? { reason } : {}) } },
   ),
-  updateVendorStatus: (token, vendorId, status) => request(
+  updateVendorStatus: (vendorId, status) => request(
     `/vendors/${encodeURIComponent(vendorId)}/status`,
-    { token, method: 'PATCH', body: { status } },
+    { method: 'PATCH', body: { status } },
   ),
-  updateCommission: (token, vendorId, type, value) => request(
+  updateCommission: (vendorId, type, value) => request(
     `/vendors/${encodeURIComponent(vendorId)}/commission`,
-    { token, method: 'PATCH', body: { type, value } },
+    { method: 'PATCH', body: { type, value } },
   ),
-  createSettlement: (token, settlement) => request('/settlements', {
-    token,
+  createSettlement: (settlement) => request('/settlements', {
     method: 'POST',
     body: settlement,
   }),
-  keepProduct: (token, vendorId, productId) => request(
+  keepProduct: (vendorId, productId) => request(
     `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}/keep`,
-    { token, method: 'PATCH', body: {} },
+    { method: 'PATCH', body: {} },
   ),
-  archiveProduct: (token, vendorId, productId) => request(
+  archiveProduct: (vendorId, productId) => request(
     `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}`,
-    { token, method: 'DELETE' },
+    { method: 'DELETE' },
   ),
 }

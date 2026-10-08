@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { adminApi, clearAdminToken, getAdminToken, saveAdminToken } from '../api/client'
+import { adminApi } from '../api/client'
 
 const DashboardContext = createContext(null)
 
@@ -24,10 +24,6 @@ const emptyData = {
 }
 
 export function DashboardProvider({ children }) {
-  const [token, setToken] = useState(null)
-  const [user, setUser] = useState(null)
-  const [authInitializing, setAuthInitializing] = useState(true)
-  const [authMessage, setAuthMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [dataReady, setDataReady] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -37,112 +33,48 @@ export function DashboardProvider({ children }) {
   const showToast = useCallback((type, message) => setToast({ type, message }), [])
   const hideToast = useCallback(() => setToast(null), [])
 
-  const logout = useCallback(() => {
-    clearAdminToken()
-    setToken(null)
-    setUser(null)
-    setAuthMessage('')
-    setLoading(false)
-    setDataReady(false)
-    setLoadError('')
-    setData(emptyData)
-  }, [])
-
-  useEffect(() => {
-    let active = true
-    const savedToken = getAdminToken()
-    if (!savedToken) {
-      setAuthInitializing(false)
-      return () => { active = false }
-    }
-
-    adminApi.me(savedToken)
-      .then((admin) => {
-        if (!active) return
-        setToken(savedToken)
-        setUser(admin)
-      })
-      .catch((error) => {
-        if (!active) return
-        if (error.status === 401) clearAdminToken()
-        else setAuthMessage(error.message)
-      })
-      .finally(() => {
-        if (active) setAuthInitializing(false)
-      })
-
-    return () => { active = false }
-  }, [])
-
-  const login = useCallback(async (email, password) => {
-    const result = await adminApi.login(email.trim(), password)
-    if (!result?.token || !result?.user?.isPlatformAdmin) {
-      throw new Error('لم يُرجع الخادم جلسة مدير صالحة.')
-    }
-    saveAdminToken(result.token)
-    setToken(result.token)
-    setUser(result.user)
-    setAuthMessage('')
-    setAuthInitializing(false)
-    setData(emptyData)
-    setDataReady(false)
-    setLoadError('')
-    return true
-  }, [])
-
-  const loadData = useCallback(async (currentToken, showSpinner = true) => {
-    if (!currentToken) return false
+  const loadData = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true)
     setLoadError('')
     try {
       const [dashboard, vendors, products, activeProducts, settlements] = await Promise.all([
-        adminApi.dashboard(currentToken),
-        fetchAllPages((page, limit) => adminApi.vendors(currentToken, page, limit)),
-        fetchAllPages((page, limit) => adminApi.products(currentToken, page, limit)),
-        fetchAllPages((page, limit) => adminApi.activeProducts(currentToken, page, limit)),
-        fetchAllPages((page, limit) => adminApi.settlements(currentToken, page, limit)),
+        adminApi.dashboard(),
+        fetchAllPages((page, limit) => adminApi.vendors(page, limit)),
+        fetchAllPages((page, limit) => adminApi.products(page, limit)),
+        fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)),
+        fetchAllPages((page, limit) => adminApi.settlements(page, limit)),
       ])
       setData({ dashboard, vendors, products, activeProducts, settlements })
       setDataReady(true)
       return true
     } catch (error) {
       setLoadError(error.message || 'تعذر تحميل بيانات لوحة الإدارة.')
-      if (error.status === 401) {
-        logout()
-        showToast('warning', 'انتهت الجلسة؛ سجّل الدخول مرة أخرى.')
-      }
       return false
     } finally {
       if (showSpinner) setLoading(false)
     }
-  }, [logout, showToast])
+  }, [])
 
   useEffect(() => {
-    if (token && user) void loadData(token, true)
-  }, [token, user, loadData])
+    void loadData(true)
+  }, [loadData])
 
-  const refresh = useCallback(() => loadData(token, true), [loadData, token])
+  const refresh = useCallback(() => loadData(true), [loadData])
 
   const runMutation = useCallback(async (operation, successMessage) => {
-    if (!token) return null
     try {
       const result = await operation()
       showToast('success', successMessage)
-      const refreshed = await loadData(token, false)
-      if (!refreshed && getAdminToken()) {
+      const refreshed = await loadData(false)
+      if (!refreshed) {
         showToast('warning', 'تم تنفيذ العملية، لكن تعذر تحديث القوائم. أعد تحميل البيانات لاحقاً.')
       }
       return result
     } catch (error) {
-      if (error.status === 401) {
-        logout()
-        showToast('warning', 'انتهت الجلسة؛ سجّل الدخول مرة أخرى.')
-      } else {
-        showToast('error', error.message || 'تعذر حفظ التغيير.')
-      }
+      showToast('error', error.message || 'تعذر حفظ التغيير.')
       return null
     }
-  }, [loadData, logout, showToast, token])
+  }, [loadData, showToast])
 
   const findProduct = useCallback((productId) => (
     [...data.products, ...data.activeProducts].find((product) => product.id === productId)
@@ -155,10 +87,10 @@ export function DashboardProvider({ children }) {
       return Promise.resolve(null)
     }
     return runMutation(
-      () => adminApi.reviewProduct(token, product.vendorId, product.id, 'approve'),
+      () => adminApi.reviewProduct(product.vendorId, product.id, 'approve'),
       'تمت الموافقة على المنتج ونشره بنجاح.'
     )
-  }, [findProduct, runMutation, showToast, token])
+  }, [findProduct, runMutation, showToast])
 
   const rejectProduct = useCallback((productId, reason) => {
     const product = findProduct(productId)
@@ -167,28 +99,28 @@ export function DashboardProvider({ children }) {
       return Promise.resolve(null)
     }
     return runMutation(
-      () => adminApi.reviewProduct(token, product.vendorId, product.id, 'reject', reason),
+      () => adminApi.reviewProduct(product.vendorId, product.id, 'reject', reason),
       'تم رفض المنتج.'
     )
-  }, [findProduct, runMutation, showToast, token])
+  }, [findProduct, runMutation, showToast])
 
   const updateCommission = useCallback((vendorId, commissionType, commissionValue) => (
     runMutation(
-      () => adminApi.updateCommission(token, vendorId, commissionType, Number(commissionValue)),
+      () => adminApi.updateCommission(vendorId, commissionType, Number(commissionValue)),
       'تم تحديث نسبة العمولة بنجاح.'
     )
-  ), [runMutation, token])
+  ), [runMutation])
 
   const updateVendorStatus = useCallback((vendorId, status) => (
     runMutation(
-      () => adminApi.updateVendorStatus(token, vendorId, status),
+      () => adminApi.updateVendorStatus(vendorId, status),
       'تم تحديث حالة التاجر.'
     )
-  ), [runMutation, token])
+  ), [runMutation])
 
   const createSettlement = useCallback((vendorId, amount, period, method) => (
     runMutation(
-      () => adminApi.createSettlement(token, {
+      () => adminApi.createSettlement({
         vendorId,
         amount: Number(amount),
         period: period.trim(),
@@ -197,7 +129,7 @@ export function DashboardProvider({ children }) {
       }),
       'تم إنشاء سند السداد بنجاح.'
     )
-  ), [data.dashboard?.currency, runMutation, token])
+  ), [data.dashboard?.currency, runMutation])
 
   const deleteActiveProduct = useCallback((productId) => {
     const product = findProduct(productId)
@@ -206,10 +138,10 @@ export function DashboardProvider({ children }) {
       return Promise.resolve(null)
     }
     return runMutation(
-      () => adminApi.archiveProduct(token, product.vendorId, product.id),
+      () => adminApi.archiveProduct(product.vendorId, product.id),
       'تمت أرشفة المنتج وإزالته من المتجر.'
     )
-  }, [findProduct, runMutation, showToast, token])
+  }, [findProduct, runMutation, showToast])
 
   const keepActiveProduct = useCallback((productId) => {
     const product = findProduct(productId)
@@ -218,19 +150,14 @@ export function DashboardProvider({ children }) {
       return Promise.resolve(null)
     }
     return runMutation(
-      () => adminApi.keepProduct(token, product.vendorId, product.id),
+      () => adminApi.keepProduct(product.vendorId, product.id),
       'تم الإبقاء على المنتج للعرض.'
     )
-  }, [findProduct, runMutation, showToast, token])
+  }, [findProduct, runMutation, showToast])
 
   const value = {
     ...data,
     recentOrders: data.dashboard?.recentOrders || [],
-    authInitializing,
-    authMessage,
-    user,
-    login,
-    logout,
     loading,
     dataReady,
     loadError,
