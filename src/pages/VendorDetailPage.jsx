@@ -29,7 +29,7 @@ import { generateVendorReportPDF } from '../utils/pdfGenerator'
 export default function VendorDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { vendors, settlements, updateVendorStatus } = useDashboard()
+  const { vendors, settlements, updateVendorStatus, user } = useDashboard()
 
   const vendor = vendors.find((v) => v.id === id)
 
@@ -45,13 +45,11 @@ export default function VendorDetailPage() {
     )
   }
 
-  const commission = calculateCommission(
-    vendor.totalSales,
-    vendor.commissionType,
-    vendor.commissionValue
-  )
+  const commission = Number.isFinite(Number(vendor.commissionAmount))
+    ? Number(vendor.commissionAmount)
+    : calculateCommission(vendor.totalSales, vendor.commissionType, vendor.commissionValue)
   const netBalance = calculateNetBalance(vendor)
-  const status = vendorStatusMap[vendor.status]
+  const status = vendorStatusMap[vendor.status] || { label: vendor.status || 'غير محدد', class: 'badge-neutral' }
   const vendorSettlements = settlements.filter((s) => s.vendorId === vendor.id)
 
   const financialCards = [
@@ -114,7 +112,7 @@ export default function VendorDetailPage() {
             </div>
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={() => generateVendorReportPDF(vendor)}
+                onClick={() => generateVendorReportPDF(vendor, user)}
                 className="btn bg-white/15 text-white hover:bg-white/25 backdrop-blur"
               >
                 <FileText size={16} />

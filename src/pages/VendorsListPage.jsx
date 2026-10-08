@@ -24,10 +24,11 @@ export default function VendorsListPage() {
   const [statusFilter, setStatusFilter] = useState('all')
 
   const filtered = vendors.filter((v) => {
+    const query = search.trim().toLocaleLowerCase()
     const matchesSearch =
-      v.companyName.includes(search) ||
-      v.merchantName.includes(search) ||
-      v.id.toLowerCase().includes(search.toLowerCase())
+      String(v.companyName || '').toLocaleLowerCase().includes(query) ||
+      String(v.merchantName || '').toLocaleLowerCase().includes(query) ||
+      String(v.id || '').toLocaleLowerCase().includes(query)
     const matchesStatus = statusFilter === 'all' || v.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -82,7 +83,7 @@ export default function VendorsListPage() {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {filtered.map((vendor) => {
-                const status = vendorStatusMap[vendor.status]
+                const status = vendorStatusMap[vendor.status] || { label: vendor.status || 'غير محدد', class: 'badge-neutral' }
                 const commission = calculateCommission(
                   vendor.totalSales,
                   vendor.commissionType,
@@ -110,15 +111,15 @@ export default function VendorsListPage() {
                       <div className="space-y-1 text-xs text-neutral-600">
                         <p className="flex items-center gap-1.5">
                           <Mail size={13} className="text-neutral-400" />
-                          {vendor.email}
+                          {vendor.email || '—'}
                         </p>
                         <p className="flex items-center gap-1.5">
                           <Phone size={13} className="text-neutral-400" />
-                          {vendor.phone}
+                          {vendor.phone || '—'}
                         </p>
                         <p className="flex items-center gap-1.5">
                           <MapPin size={13} className="text-neutral-400" />
-                          {vendor.city}
+                          {vendor.city || '—'}
                         </p>
                       </div>
                     </td>

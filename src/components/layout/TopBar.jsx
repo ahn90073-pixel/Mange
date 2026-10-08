@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { Menu, Bell, Search, RefreshCw, X } from 'lucide-react'
-import { adminInfo } from '../../data/mockData'
 import { checkAndroidOtaNow } from '../../utils/androidOta'
 
-export default function TopBar({ onMenuClick, title, subtitle }) {
+export default function TopBar({ onMenuClick, title, subtitle, user }) {
   const [otaResult, setOtaResult] = useState(null)
   const [checkingOta, setCheckingOta] = useState(false)
   const isAndroid = Capacitor.getPlatform() === 'android'
@@ -138,11 +137,11 @@ export default function TopBar({ onMenuClick, title, subtitle }) {
 
           <div className="hidden items-center gap-2.5 border-r border-white/20 pr-3 sm:flex">
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">{adminInfo.adminName}</p>
-              <p className="text-xs text-slate-200/70">{adminInfo.email}</p>
+              <p className="text-sm font-semibold text-white">{user?.fullName || user?.email || 'مدير المنصة'}</p>
+              <p className="text-xs text-slate-200/70">{user?.email}</p>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-300 text-sm font-bold text-[#102b4a] ring-2 ring-white/20">
-              م
+              {user?.fullName?.trim()?.charAt(0) || 'م'}
             </div>
           </div>
         </div>

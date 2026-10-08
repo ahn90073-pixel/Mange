@@ -9,7 +9,6 @@ import {
   LogOut,
   X,
 } from 'lucide-react'
-import { adminInfo } from '../../data/mockData'
 
 const navItems = [
   { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true },
@@ -20,7 +19,7 @@ const navItems = [
   { to: '/settlements', label: 'السدادات المالية', icon: Receipt },
 ]
 
-export default function Sidebar({ open, onClose }) {
+export default function Sidebar({ open, onClose, user, onLogout }) {
   return (
     <>
       {/* Mobile overlay */}
@@ -95,13 +94,13 @@ export default function Sidebar({ open, onClose }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">
-                {adminInfo.adminName}
+                {user?.fullName || user?.email || 'مدير المنصة'}
               </p>
               <p className="text-neutral-400 text-xs truncate">
-                {adminInfo.role}
+                مدير المنصة
               </p>
             </div>
-            <button className="text-neutral-400 hover:text-danger-500 transition-colors p-1">
+            <button onClick={onLogout} aria-label="تسجيل الخروج" title="تسجيل الخروج" className="text-neutral-400 hover:text-danger-500 transition-colors p-1">
               <LogOut size={18} />
             </button>
           </div>

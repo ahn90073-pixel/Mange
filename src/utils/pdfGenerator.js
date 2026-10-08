@@ -1,10 +1,15 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { adminInfo } from '../data/mockData'
-import { formatCurrency, formatDate } from './format'
+import { calculateCommission, calculateNetBalance, formatCurrency, formatDate } from './format'
+
+function getAdminInfo(user) {
+  const adminName = user?.fullName || user?.email || 'مدير المنصة'
+  return { name: 'منصة التجار', adminName, role: 'مدير المنصة', email: user?.email || '' }
+}
 
 // Generate a Payment Voucher / Settlement Receipt PDF
-export function generatePaymentVoucherPDF(settlement, vendor) {
+export function generatePaymentVoucherPDF(settlement, vendor, user) {
+  const adminInfo = getAdminInfo(user)
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const marginX = 20
@@ -68,9 +73,9 @@ export function generatePaymentVoucherPDF(settlement, vendor) {
   doc.text('Financial Details / تفاصيل المعاملة المالية', marginX, afterY)
 
   const financialRows = [
-    ['Gross Amount / إجمالي المبلغ', formatCurrency(settlement.amount)],
-    ['Commission Deducted / العمولة المقتطعة', `- ${formatCurrency(settlement.commissionDeducted)}`],
-    ['Net Amount Paid / الصافي المدفوع', formatCurrency(settlement.netAmount)],
+    ['Gross Amount / إجمالي المبلغ', formatCurrency(settlement.amount, settlement.currency)],
+    ['Commission Deducted / العمولة المقتطعة', `- ${formatCurrency(settlement.commissionDeducted, settlement.currency)}`],
+    ['Net Amount Paid / الصافي المدفوع', formatCurrency(settlement.netAmount, settlement.currency)],
     ['Period / الفترة المالية', settlement.period],
     ['Payment Method / طريقة الدفع', settlement.method],
     ['Reference / رقم المرجع', settlement.reference || '—'],
@@ -101,7 +106,7 @@ export function generatePaymentVoucherPDF(settlement, vendor) {
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
   doc.text(
-    `Total Net Paid / إجمالي الصافي المدفوع: ${formatCurrency(settlement.netAmount)}`,
+    `Total Net Paid / إجمالي الصافي المدفوع: ${formatCurrency(settlement.netAmount, settlement.currency)}`,
     pageWidth / 2,
     signY + 11,
     { align: 'center' }
@@ -143,7 +148,8 @@ export function generatePaymentVoucherPDF(settlement, vendor) {
 }
 
 // Generate a vendor financial report PDF
-export function generateVendorReportPDF(vendor) {
+export function generateVendorReportPDF(vendor, user) {
+  const adminInfo = getAdminInfo(user)
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const marginX = 20
@@ -198,10 +204,10 @@ export function generateVendorReportPDF(vendor) {
   doc.setTextColor(29, 101, 242)
   doc.text('Financial Summary / الملخص المالي', marginX, afterY)
 
-  const commission = vendor.commissionType === 'percentage'
-    ? Math.round((vendor.totalSales * vendor.commissionValue) / 100)
-    : vendor.commissionValue
-  const netBalance = vendor.totalSales - commission - vendor.settledAmount
+  const commission = Number.isFinite(Number(vendor.commissionAmount))
+    ? Number(vendor.commissionAmount)
+    : calculateCommission(vendor.totalSales, vendor.commissionType, vendor.commissionValue)
+  const netBalance = calculateNetBalance(vendor)
 
   const financialRows = [
     ['Total Sales / إجمالي المبيعات', formatCurrency(vendor.totalSales)],

@@ -1,8 +1,50 @@
-# React + Vite
+# تطبيق إدارة Mange
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+واجهة React وVite عربية لإدارة المنصة، متصلة بواجهة الإدارة المستقلة المنشورة على Cloudflare Workers.
 
-Currently, two official plugins are available:
+## تشغيل محلي
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm ci
+cp .env.example .env.local
+npm run dev
+```
+
+الإعدادات في `.env.local` تخص الواجهة فقط، ولا يوضع فيها أي سرّ أو كلمة مرور:
+
+```env
+VITE_ADMIN_API_BASE_URL=https://mangerbackend.ahn90073.workers.dev/api/admin
+VITE_CURRENCY=EGP
+```
+
+عنوان API الافتراضي مضمّن في التطبيق، والعملة الافتراضية `EGP` لمطابقة Worker الحالي. يمكن تغييرهما في `.env.local` أو متغيرات بيئة البناء.
+
+## تسجيل الدخول
+
+سجّل الدخول بحساب موجود في قاعدة المتجر ومفعّل له `is_platform_admin = true`. لا يوجد تسجيل مدير عام من الواجهة. يتحقق التطبيق من الجلسة عبر `/auth/me`، ويحفظ رمز Bearer محليًا، ويمسحه عند تسجيل الخروج أو انتهاء صلاحيته. الرمز صالح 12 ساعة وفق Backend الإدارة.
+
+إذا لم يكن الحساب مفعّلًا كمدير منصة، يجب على مسؤول قاعدة البيانات منحه الصلاحية باستخدام أداة `grant-platform-admin.js` في مستودع `mangerbackend`، وليس بإضافة مفتاح أو كلمة مرور إلى الواجهة.
+
+## البيانات والعمليات المتصلة
+
+تُحمّل لوحة المؤشرات والتجار والمنتجات والسدادات من API مع pagination. تشمل العمليات التي تُرسل إلى الخادم:
+
+- اعتماد المنتج أو رفضه بسبب، والإبقاء على منتج منشور أو أرشفته.
+- تحديث حالة التاجر ونوع العمولة وقيمتها.
+- إنشاء سند سداد؛ الخادم هو المرجع النهائي لحساب العمولة والرصيد والتحقق من الحد المتاح.
+- تحديث بيانات لوحة المؤشرات بعد العمليات الناجحة.
+
+لم تعد قوائم التجار والمنتجات والسدادات التجريبية تستخدم كمصدر بيانات؛ بقيت خرائط العرض النصية فقط.
+
+## النطاقات وCORS
+
+يسمح Worker حاليًا بـ`localhost:5173` و`localhost:4173` وتطبيقات Capacitor المحلية. عند نشر الواجهة على نطاق عام، أضف أصل الموقع المحدد إلى `ADMIN_CORS_ORIGINS` في إعدادات Worker عبر مستودع `mangerbackend`. لا تستخدم wildcard (`*`) للوحة إدارة محمية.
+
+لا تُضمّن `DATABASE_URL` أو `JWT_SECRET` أو أي بيانات اعتماد في ملفات الواجهة أو `VITE_*`؛ تبقى الأسرار على الخادم فقط.
+
+## الفحوص
+
+```bash
+npm run lint
+npm run build
+```

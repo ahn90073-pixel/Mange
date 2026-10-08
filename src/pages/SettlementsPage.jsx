@@ -17,10 +17,11 @@ import { generatePaymentVoucherPDF } from '../utils/pdfGenerator'
 import Modal from '../components/ui/Modal'
 
 export default function SettlementsPage() {
-  const { settlements, vendors, createSettlement } = useDashboard()
+  const { settlements, vendors, dashboard, createSettlement, user } = useDashboard()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [newModal, setNewModal] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     vendorId: '',
     amount: '',
@@ -30,9 +31,9 @@ export default function SettlementsPage() {
 
   const filtered = settlements.filter((s) => {
     const matchesSearch =
-      s.vendorName.includes(search) ||
-      s.id.toLowerCase().includes(search.toLowerCase()) ||
-      s.reference?.toLowerCase().includes(search.toLowerCase())
+      String(s.vendorName || '').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) ||
+      String(s.id || '').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) ||
+      String(s.reference || '').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -44,14 +45,21 @@ export default function SettlementsPage() {
 
   const handleDownload = (settlement) => {
     const vendor = vendors.find((v) => v.id === settlement.vendorId)
-    generatePaymentVoucherPDF(settlement, vendor)
+    generatePaymentVoucherPDF(settlement, vendor, user)
   }
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (form.vendorId && form.amount && form.period) {
-      createSettlement(form.vendorId, Number(form.amount), form.period, form.method)
-      setNewModal(false)
-      setForm({ vendorId: '', amount: '', period: '', method: 'تحويل بنكي' })
+      setSaving(true)
+      try {
+        const result = await createSettlement(form.vendorId, Number(form.amount), form.period, form.method)
+        if (result) {
+          setNewModal(false)
+          setForm({ vendorId: '', amount: '', period: '', method: 'تحويل بنكي' })
+        }
+      } finally {
+        setSaving(false)
+      }
     }
   }
 
@@ -138,7 +146,7 @@ export default function SettlementsPage() {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {filtered.map((s) => {
-                const status = settlementStatusMap[s.status]
+                const status = settlementStatusMap[s.status] || { label: s.status || 'غير محدد', class: 'badge-neutral' }
                 return (
                   <tr key={s.id} className="table-row-hover">
                     <td className="px-5 py-4">
@@ -149,13 +157,13 @@ export default function SettlementsPage() {
                     <td className="px-5 py-4 text-neutral-600">{formatDate(s.date)}</td>
                     <td className="px-5 py-4 text-neutral-600">{s.period}</td>
                     <td className="px-5 py-4 font-medium text-neutral-900">
-                      {formatCurrency(s.amount)}
+                      {formatCurrency(s.amount, s.currency)}
                     </td>
                     <td className="px-5 py-4 text-warning-600">
-                      {formatCurrency(s.commissionDeducted)}
+                      {formatCurrency(s.commissionDeducted, s.currency)}
                     </td>
                     <td className="px-5 py-4 font-bold text-success-600">
-                      {formatCurrency(s.netAmount)}
+                      {formatCurrency(s.netAmount, s.currency)}
                     </td>
                     <td className="px-5 py-4">
                       <span className="badge-neutral">{s.method}</span>
@@ -224,7 +232,6 @@ export default function SettlementsPage() {
                   v.commissionType === 'percentage'
                     ? Math.round((Number(form.amount || 0) * v.commissionValue) / 100)
                     : v.commissionValue
-                const net = Number(form.amount || 0) - commission
                 return (
                   <div className="space-y-1.5 text-sm">
                     <p className="text-xs text-neutral-600 mb-2">معاينة الحساب:</p>
@@ -239,7 +246,7 @@ export default function SettlementsPage() {
                     <div className="flex justify-between pt-1.5 border-t border-primary-100">
                       <span className="text-neutral-500">الصافي المستحق:</span>
                       <span className="font-bold text-success-600">
-                        {formatCurrency(v.totalSales - (v.commissionType === 'percentage' ? Math.round((v.totalSales * v.commissionValue) / 100) : v.commissionValue) - v.settledAmount)}
+                        {formatCurrency(v.totalSales - commission - v.settledAmount)}
                       </span>
                     </div>
                   </div>
@@ -251,7 +258,7 @@ export default function SettlementsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">
-                المبلغ الإجمالي (ريال)
+                المبلغ الإجمالي ({dashboard?.currency || import.meta.env.VITE_CURRENCY || 'EGP'})
               </label>
               <input
                 type="number"
@@ -337,7 +344,7 @@ export default function SettlementsPage() {
             </button>
             <button
               onClick={handleCreate}
-              disabled={!form.vendorId || !form.amount || !form.period}
+              disabled={saving || !form.vendorId || !form.amount || !form.period}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileText size={16} />

@@ -22,12 +22,14 @@ export default function PendingProductsPage() {
   const [statusFilter, setStatusFilter] = useState('pending')
   const [rejectModal, setRejectModal] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [busyProductId, setBusyProductId] = useState(null)
 
   const filtered = products.filter((p) => {
+    const query = search.trim().toLocaleLowerCase()
     const matchesSearch =
-      p.name.includes(search) ||
-      p.vendorName.includes(search) ||
-      p.id.toLowerCase().includes(search.toLowerCase())
+      String(p.name || '').toLocaleLowerCase().includes(query) ||
+      String(p.vendorName || '').toLocaleLowerCase().includes(query) ||
+      String(p.id || '').toLocaleLowerCase().includes(query)
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -36,11 +38,27 @@ export default function PendingProductsPage() {
   const approvedCount = products.filter((p) => p.status === 'approved').length
   const rejectedCount = products.filter((p) => p.status === 'rejected').length
 
-  const handleReject = () => {
+  const handleApprove = async (product) => {
+    setBusyProductId(product.id)
+    try {
+      await approveProduct(product.id)
+    } finally {
+      setBusyProductId(null)
+    }
+  }
+
+  const handleReject = async () => {
     if (rejectModal && rejectReason.trim()) {
-      rejectProduct(rejectModal.id, rejectReason.trim())
-      setRejectModal(null)
-      setRejectReason('')
+      setBusyProductId(rejectModal.id)
+      try {
+        const result = await rejectProduct(rejectModal.id, rejectReason.trim())
+        if (result) {
+          setRejectModal(null)
+          setRejectReason('')
+        }
+      } finally {
+        setBusyProductId(null)
+      }
     }
   }
 
@@ -167,8 +185,9 @@ export default function PendingProductsPage() {
               {product.status === 'pending' && (
                 <div className="flex gap-2 mt-4">
                   <button
-                    onClick={() => approveProduct(product.id)}
-                    className="btn-success flex-1"
+                    onClick={() => handleApprove(product)}
+                    disabled={busyProductId === product.id}
+                    className="btn-success flex-1 disabled:cursor-wait disabled:opacity-60"
                   >
                     <Check size={16} />
                     موافقة
@@ -178,6 +197,7 @@ export default function PendingProductsPage() {
                       setRejectModal(product)
                       setRejectReason('')
                     }}
+                    disabled={busyProductId === product.id}
                     className="btn-danger flex-1"
                   >
                     <X size={16} />

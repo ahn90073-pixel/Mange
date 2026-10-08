@@ -1,24 +1,28 @@
-// Formatting and helper utilities for the dashboard.
+// Formatting helpers for values supplied by the administration API.
+const locale = import.meta.env.VITE_LOCALE || 'ar-EG'
+const defaultCurrency = import.meta.env.VITE_CURRENCY || 'EGP'
 
-export function formatCurrency(amount) {
-  if (amount === null || amount === undefined) return '—'
-  return new Intl.NumberFormat('ar-SA', {
+export function formatCurrency(amount, currency = defaultCurrency) {
+  if (amount === null || amount === undefined || !Number.isFinite(Number(amount))) return '—'
+  const safeCurrency = /^[A-Z]{3}$/.test(currency || '') ? currency : defaultCurrency
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'SAR',
+    currency: safeCurrency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
+    maximumFractionDigits: 2,
+  }).format(Number(amount))
 }
 
 export function formatNumber(num) {
-  if (num === null || num === undefined) return '—'
-  return new Intl.NumberFormat('ar-SA').format(num)
+  if (num === null || num === undefined || !Number.isFinite(Number(num))) return '—'
+  return new Intl.NumberFormat(locale).format(Number(num))
 }
 
 export function formatDate(dateStr) {
   if (!dateStr) return '—'
   const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('ar-SA', {
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat(locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -28,29 +32,31 @@ export function formatDate(dateStr) {
 export function formatDateShort(dateStr) {
   if (!dateStr) return '—'
   const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('ar-SA', {
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   }).format(date)
 }
 
-// Calculate commission amount for a vendor based on type and value
 export function calculateCommission(totalSales, commissionType, commissionValue) {
-  if (!totalSales || totalSales === 0) return 0
-  if (commissionType === 'percentage') {
-    return Math.round((totalSales * commissionValue) / 100)
-  }
-  // For fixed commission, it's per-order — we approximate with a flat amount
-  return commissionValue
+  const sales = Math.max(0, Number(totalSales) || 0)
+  const value = Math.max(0, Number(commissionValue) || 0)
+  if (commissionType === 'percentage') return Math.round(sales * value) / 100
+  return Math.min(sales, value)
 }
 
-// Calculate net balance for a vendor (totalSales - commission - settledAmount)
 export function calculateNetBalance(vendor) {
-  const commission = calculateCommission(vendor.totalSales, vendor.commissionType, vendor.commissionValue)
-  return vendor.totalSales - commission - vendor.settledAmount
+  if (vendor?.netBalance !== null && vendor?.netBalance !== undefined && Number.isFinite(Number(vendor.netBalance))) {
+    return Number(vendor.netBalance)
+  }
+  const commission = Number.isFinite(Number(vendor?.commissionAmount))
+    ? Number(vendor.commissionAmount)
+    : calculateCommission(vendor?.totalSales, vendor?.commissionType, vendor?.commissionValue)
+  return Number(vendor?.totalSales || 0) - commission - Number(vendor?.settledAmount || 0)
 }
 
 export function getVendorById(id, vendorList) {
-  return vendorList.find((v) => v.id === id)
+  return vendorList.find((vendor) => vendor.id === id)
 }

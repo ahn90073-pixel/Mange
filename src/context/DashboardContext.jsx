@@ -1,182 +1,240 @@
-import { createContext, useContext, useState, useCallback } from 'react'
-import {
-  vendors as initialVendors,
-  pendingProducts as initialProducts,
-  settlements as initialSettlements,
-  activeProducts as initialActiveProducts,
-} from '../data/mockData'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { adminApi, clearAdminToken, getAdminToken, saveAdminToken } from '../api/client'
 
 const DashboardContext = createContext(null)
 
+async function fetchAllPages(fetchPage) {
+  const first = await fetchPage(1, 100)
+  const items = first?.items || []
+  const totalPages = Math.max(1, Number(first?.pagination?.totalPages) || 1)
+  if (totalPages === 1) return items
+
+  const remaining = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2, 100))
+  )
+  return items.concat(...remaining.map((page) => page?.items || []))
+}
+
+const emptyData = {
+  dashboard: null,
+  vendors: [],
+  products: [],
+  activeProducts: [],
+  settlements: [],
+}
+
 export function DashboardProvider({ children }) {
-  const [vendors, setVendors] = useState(initialVendors)
-  const [products, setProducts] = useState(initialProducts)
-  const [settlements, setSettlements] = useState(initialSettlements)
-  const [activeProducts, setActiveProducts] = useState(initialActiveProducts)
+  const [token, setToken] = useState(null)
+  const [user, setUser] = useState(null)
+  const [authInitializing, setAuthInitializing] = useState(true)
+  const [authMessage, setAuthMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [dataReady, setDataReady] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [data, setData] = useState(emptyData)
   const [toast, setToast] = useState(null)
 
-  const showToast = useCallback((type, message) => {
-    setToast({ type, message })
-  }, [])
-
+  const showToast = useCallback((type, message) => setToast({ type, message }), [])
   const hideToast = useCallback(() => setToast(null), [])
 
-  // Approve a pending product
-  const approveProduct = useCallback(
-    (productId) => {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === productId ? { ...p, status: 'approved' } : p
-        )
-      )
-      // Increment vendor's total products
-      const product = products.find((p) => p.id === productId)
-      if (product) {
-        setVendors((prev) =>
-          prev.map((v) =>
-            v.id === product.vendorId
-              ? {
-                  ...v,
-                  pendingProducts: Math.max(0, v.pendingProducts - 1),
-                  totalProducts: v.totalProducts + 1,
-                }
-              : v
-          )
-        )
+  const logout = useCallback(() => {
+    clearAdminToken()
+    setToken(null)
+    setUser(null)
+    setAuthMessage('')
+    setLoading(false)
+    setDataReady(false)
+    setLoadError('')
+    setData(emptyData)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    const savedToken = getAdminToken()
+    if (!savedToken) {
+      setAuthInitializing(false)
+      return () => { active = false }
+    }
+
+    adminApi.me(savedToken)
+      .then((admin) => {
+        if (!active) return
+        setToken(savedToken)
+        setUser(admin)
+      })
+      .catch((error) => {
+        if (!active) return
+        if (error.status === 401) clearAdminToken()
+        else setAuthMessage(error.message)
+      })
+      .finally(() => {
+        if (active) setAuthInitializing(false)
+      })
+
+    return () => { active = false }
+  }, [])
+
+  const login = useCallback(async (email, password) => {
+    const result = await adminApi.login(email.trim(), password)
+    if (!result?.token || !result?.user?.isPlatformAdmin) {
+      throw new Error('لم يُرجع الخادم جلسة مدير صالحة.')
+    }
+    saveAdminToken(result.token)
+    setToken(result.token)
+    setUser(result.user)
+    setAuthMessage('')
+    setAuthInitializing(false)
+    setData(emptyData)
+    setDataReady(false)
+    setLoadError('')
+    return true
+  }, [])
+
+  const loadData = useCallback(async (currentToken, showSpinner = true) => {
+    if (!currentToken) return false
+    if (showSpinner) setLoading(true)
+    setLoadError('')
+    try {
+      const [dashboard, vendors, products, activeProducts, settlements] = await Promise.all([
+        adminApi.dashboard(currentToken),
+        fetchAllPages((page, limit) => adminApi.vendors(currentToken, page, limit)),
+        fetchAllPages((page, limit) => adminApi.products(currentToken, page, limit)),
+        fetchAllPages((page, limit) => adminApi.activeProducts(currentToken, page, limit)),
+        fetchAllPages((page, limit) => adminApi.settlements(currentToken, page, limit)),
+      ])
+      setData({ dashboard, vendors, products, activeProducts, settlements })
+      setDataReady(true)
+      return true
+    } catch (error) {
+      setLoadError(error.message || 'تعذر تحميل بيانات لوحة الإدارة.')
+      if (error.status === 401) {
+        logout()
+        showToast('warning', 'انتهت الجلسة؛ سجّل الدخول مرة أخرى.')
       }
-      showToast('success', 'تمت الموافقة على المنتج ونشره بنجاح')
-    },
-    [products, showToast]
-  )
+      return false
+    } finally {
+      if (showSpinner) setLoading(false)
+    }
+  }, [logout, showToast])
 
-  // Reject a pending product with a reason
-  const rejectProduct = useCallback(
-    (productId, reason) => {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === productId
-            ? { ...p, status: 'rejected', rejectReason: reason }
-            : p
-        )
-      )
-      const product = products.find((p) => p.id === productId)
-      if (product) {
-        setVendors((prev) =>
-          prev.map((v) =>
-            v.id === product.vendorId
-              ? { ...v, pendingProducts: Math.max(0, v.pendingProducts - 1) }
-              : v
-          )
-        )
+  useEffect(() => {
+    if (token && user) void loadData(token, true)
+  }, [token, user, loadData])
+
+  const refresh = useCallback(() => loadData(token, true), [loadData, token])
+
+  const runMutation = useCallback(async (operation, successMessage) => {
+    if (!token) return null
+    try {
+      const result = await operation()
+      showToast('success', successMessage)
+      const refreshed = await loadData(token, false)
+      if (!refreshed && getAdminToken()) {
+        showToast('warning', 'تم تنفيذ العملية، لكن تعذر تحديث القوائم. أعد تحميل البيانات لاحقاً.')
       }
-      showToast('info', 'تم رفض المنتج')
-    },
-    [products, showToast]
-  )
+      return result
+    } catch (error) {
+      if (error.status === 401) {
+        logout()
+        showToast('warning', 'انتهت الجلسة؛ سجّل الدخول مرة أخرى.')
+      } else {
+        showToast('error', error.message || 'تعذر حفظ التغيير.')
+      }
+      return null
+    }
+  }, [loadData, logout, showToast, token])
 
-  // Update vendor commission
-  const updateCommission = useCallback(
-    (vendorId, commissionType, commissionValue) => {
-      setVendors((prev) =>
-        prev.map((v) =>
-          v.id === vendorId
-            ? { ...v, commissionType, commissionValue }
-            : v
-        )
-      )
-      showToast('success', 'تم تحديث نسبة العمولة بنجاح')
-    },
-    [showToast]
-  )
+  const findProduct = useCallback((productId) => (
+    [...data.products, ...data.activeProducts].find((product) => product.id === productId)
+  ), [data.activeProducts, data.products])
 
-  // Update vendor status
-  const updateVendorStatus = useCallback(
-    (vendorId, status) => {
-      setVendors((prev) =>
-        prev.map((v) => (v.id === vendorId ? { ...v, status } : v))
-      )
-      showToast('success', 'تم تحديث حالة التاجر')
-    },
-    [showToast]
-  )
+  const approveProduct = useCallback((productId) => {
+    const product = findProduct(productId)
+    if (!product) {
+      showToast('error', 'تعذر العثور على المنتج المطلوب.')
+      return Promise.resolve(null)
+    }
+    return runMutation(
+      () => adminApi.reviewProduct(token, product.vendorId, product.id, 'approve'),
+      'تمت الموافقة على المنتج ونشره بنجاح.'
+    )
+  }, [findProduct, runMutation, showToast, token])
 
-  // Create a new settlement
-  const createSettlement = useCallback(
-    (vendorId, amount, period, method) => {
-      const vendor = vendors.find((v) => v.id === vendorId)
-      if (!vendor) return
+  const rejectProduct = useCallback((productId, reason) => {
+    const product = findProduct(productId)
+    if (!product) {
+      showToast('error', 'تعذر العثور على المنتج المطلوب.')
+      return Promise.resolve(null)
+    }
+    return runMutation(
+      () => adminApi.reviewProduct(token, product.vendorId, product.id, 'reject', reason),
+      'تم رفض المنتج.'
+    )
+  }, [findProduct, runMutation, showToast, token])
 
-      const commission =
-        vendor.commissionType === 'percentage'
-          ? Math.round((amount * vendor.commissionValue) / 100)
-          : vendor.commissionValue
+  const updateCommission = useCallback((vendorId, commissionType, commissionValue) => (
+    runMutation(
+      () => adminApi.updateCommission(token, vendorId, commissionType, Number(commissionValue)),
+      'تم تحديث نسبة العمولة بنجاح.'
+    )
+  ), [runMutation, token])
 
-      const netAmount = amount - commission
-      const newSettlement = {
-        id: `STL-2026-${String(settlements.length + 1).padStart(3, '0')}`,
+  const updateVendorStatus = useCallback((vendorId, status) => (
+    runMutation(
+      () => adminApi.updateVendorStatus(token, vendorId, status),
+      'تم تحديث حالة التاجر.'
+    )
+  ), [runMutation, token])
+
+  const createSettlement = useCallback((vendorId, amount, period, method) => (
+    runMutation(
+      () => adminApi.createSettlement(token, {
         vendorId,
-        vendorName: vendor.companyName,
-        amount,
-        commissionDeducted: commission,
-        netAmount,
-        period,
-        date: new Date().toISOString().split('T')[0],
-        status: 'completed',
+        amount: Number(amount),
+        period: period.trim(),
         method,
-        reference: `TXN-${Math.floor(Math.random() * 1000000)}`,
-      }
+        currency: data.dashboard?.currency || import.meta.env.VITE_CURRENCY || 'EGP',
+      }),
+      'تم إنشاء سند السداد بنجاح.'
+    )
+  ), [data.dashboard?.currency, runMutation, token])
 
-      setSettlements((prev) => [newSettlement, ...prev])
-      setVendors((prev) =>
-        prev.map((v) =>
-          v.id === vendorId
-            ? { ...v, settledAmount: v.settledAmount + netAmount }
-            : v
-        )
-      )
-      showToast('success', 'تم إنشاء سند السداد بنجاح')
-      return newSettlement
-    },
-    [vendors, settlements.length, showToast]
-  )
+  const deleteActiveProduct = useCallback((productId) => {
+    const product = findProduct(productId)
+    if (!product) {
+      showToast('error', 'تعذر العثور على المنتج المطلوب.')
+      return Promise.resolve(null)
+    }
+    return runMutation(
+      () => adminApi.archiveProduct(token, product.vendorId, product.id),
+      'تمت أرشفة المنتج وإزالته من المتجر.'
+    )
+  }, [findProduct, runMutation, showToast, token])
 
-  // Delete an active product (remove from listing)
-  const deleteActiveProduct = useCallback(
-    (productId) => {
-      const product = activeProducts.find((p) => p.id === productId)
-      setActiveProducts((prev) => prev.filter((p) => p.id !== productId))
-      if (product) {
-        setVendors((prev) =>
-          prev.map((v) =>
-            v.id === product.vendorId
-              ? { ...v, totalProducts: Math.max(0, v.totalProducts - 1) }
-              : v
-          )
-        )
-      }
-      showToast('success', 'تم حذف المنتج من القائمة بنجاح')
-    },
-    [activeProducts, showToast]
-  )
-
-  // Keep an active product for display (mark as kept)
-  const keepActiveProduct = useCallback(
-    (productId) => {
-      setActiveProducts((prev) =>
-        prev.map((p) =>
-          p.id === productId ? { ...p, kept: true } : p
-        )
-      )
-      showToast('success', 'تم الإبقاء على المنتج للعرض')
-    },
-    [showToast]
-  )
+  const keepActiveProduct = useCallback((productId) => {
+    const product = findProduct(productId)
+    if (!product) {
+      showToast('error', 'تعذر العثور على المنتج المطلوب.')
+      return Promise.resolve(null)
+    }
+    return runMutation(
+      () => adminApi.keepProduct(token, product.vendorId, product.id),
+      'تم الإبقاء على المنتج للعرض.'
+    )
+  }, [findProduct, runMutation, showToast, token])
 
   const value = {
-    vendors,
-    products,
-    activeProducts,
-    settlements,
+    ...data,
+    recentOrders: data.dashboard?.recentOrders || [],
+    authInitializing,
+    authMessage,
+    user,
+    login,
+    logout,
+    loading,
+    dataReady,
+    loadError,
+    refresh,
     toast,
     showToast,
     hideToast,
@@ -189,17 +247,11 @@ export function DashboardProvider({ children }) {
     keepActiveProduct,
   }
 
-  return (
-    <DashboardContext.Provider value={value}>
-      {children}
-    </DashboardContext.Provider>
-  )
+  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>
 }
 
 export function useDashboard() {
-  const ctx = useContext(DashboardContext)
-  if (!ctx) {
-    throw new Error('useDashboard must be used within DashboardProvider')
-  }
-  return ctx
+  const context = useContext(DashboardContext)
+  if (!context) throw new Error('useDashboard must be used within DashboardProvider')
+  return context
 }

@@ -5,7 +5,6 @@ import {
   Save,
   Search,
   TrendingUp,
-  Check,
 } from 'lucide-react'
 import { useDashboard } from '../context/DashboardContext'
 import {
@@ -20,10 +19,12 @@ export default function CommissionsPage() {
   const { vendors, updateCommission } = useDashboard()
   const [search, setSearch] = useState('')
   const [editModal, setEditModal] = useState(null)
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ type: 'percentage', value: 0 })
 
   const filtered = vendors.filter((v) =>
-    v.companyName.includes(search) || v.merchantName.includes(search)
+    String(v.companyName || '').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) ||
+    String(v.merchantName || '').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
   )
 
   const openEdit = (vendor) => {
@@ -31,10 +32,15 @@ export default function CommissionsPage() {
     setEditModal(vendor)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editModal && form.value >= 0) {
-      updateCommission(editModal.id, form.type, Number(form.value))
-      setEditModal(null)
+      setSaving(true)
+      try {
+        const result = await updateCommission(editModal.id, form.type, Number(form.value))
+        if (result) setEditModal(null)
+      } finally {
+        setSaving(false)
+      }
     }
   }
 
@@ -115,12 +121,10 @@ export default function CommissionsPage() {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {filtered.map((vendor) => {
-                const status = vendorStatusMap[vendor.status]
-                const commission = calculateCommission(
-                  vendor.totalSales,
-                  vendor.commissionType,
-                  vendor.commissionValue
-                )
+                const status = vendorStatusMap[vendor.status] || { label: vendor.status || 'غير محدد', class: 'badge-neutral' }
+                const commission = Number.isFinite(Number(vendor.commissionAmount))
+                  ? Number(vendor.commissionAmount)
+                  : calculateCommission(vendor.totalSales, vendor.commissionType, vendor.commissionValue)
                 const netBalance = calculateNetBalance(vendor)
                 return (
                   <tr key={vendor.id} className="table-row-hover">
@@ -283,7 +287,7 @@ export default function CommissionsPage() {
               <button onClick={() => setEditModal(null)} className="btn-secondary">
                 إلغاء
               </button>
-              <button onClick={handleSave} className="btn-primary">
+              <button onClick={handleSave} disabled={saving} className="btn-primary disabled:cursor-wait disabled:opacity-60">
                 <Save size={16} />
                 حفظ التغييرات
               </button>

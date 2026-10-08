@@ -38,6 +38,7 @@ export default function ActiveProductsPage() {
   const [search, setSearch] = useState('')
   const [vendorFilter, setVendorFilter] = useState('all')
   const [deleteModal, setDeleteModal] = useState(null)
+  const [busyProductId, setBusyProductId] = useState(null)
 
   // Only show products older than one month
   const oldProducts = useMemo(
@@ -46,10 +47,11 @@ export default function ActiveProductsPage() {
   )
 
   const filtered = oldProducts.filter((p) => {
+    const query = search.trim().toLocaleLowerCase()
     const matchesSearch =
-      p.name.includes(search) ||
-      p.category.includes(search) ||
-      p.id.toLowerCase().includes(search.toLowerCase())
+      String(p.name || '').toLocaleLowerCase().includes(query) ||
+      String(p.category || '').toLocaleLowerCase().includes(query) ||
+      String(p.id || '').toLocaleLowerCase().includes(query)
     const matchesVendor = vendorFilter === 'all' || p.vendorId === vendorFilter
     return matchesSearch && matchesVendor
   })
@@ -71,10 +73,24 @@ export default function ActiveProductsPage() {
     (a, b) => b.products.length - a.products.length
   )
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteModal) {
-      deleteActiveProduct(deleteModal.id)
-      setDeleteModal(null)
+      setBusyProductId(deleteModal.id)
+      try {
+        const result = await deleteActiveProduct(deleteModal.id)
+        if (result) setDeleteModal(null)
+      } finally {
+        setBusyProductId(null)
+      }
+    }
+  }
+
+  const handleKeep = async (product) => {
+    setBusyProductId(product.id)
+    try {
+      await keepActiveProduct(product.id)
+    } finally {
+      setBusyProductId(null)
     }
   }
 
@@ -241,14 +257,16 @@ export default function ActiveProductsPage() {
                                 ) : (
                                   <>
                                     <button
-                                      onClick={() => keepActiveProduct(product.id)}
-                                      className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-success-600 hover:bg-success-50 transition-colors"
+                                      onClick={() => handleKeep(product)}
+                                      disabled={busyProductId === product.id}
+                                      className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-success-600 hover:bg-success-50 transition-colors disabled:opacity-50"
                                       title="إبقاء للعرض"
                                     >
                                       <Eye size={18} />
                                     </button>
                                     <button
                                       onClick={() => setDeleteModal(product)}
+                                      disabled={busyProductId === product.id}
                                       className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-danger-600 hover:bg-danger-50 transition-colors"
                                       title="حذف المنتج"
                                     >

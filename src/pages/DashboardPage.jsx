@@ -10,28 +10,25 @@ import {
 } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import { useDashboard } from '../context/DashboardContext'
-import { formatCurrency, formatNumber, calculateCommission, calculateNetBalance } from '../utils/format'
-import {
-  vendorStatusMap,
-  orderStatusMap,
-  recentOrders,
-} from '../data/mockData'
+import { formatCurrency, formatNumber, calculateCommission } from '../utils/format'
+import { orderStatusMap } from '../data/mockData'
 
 export default function DashboardPage() {
-  const { vendors, products, settlements } = useDashboard()
+  const { vendors, products, settlements, dashboard, recentOrders } = useDashboard()
+  const metrics = dashboard?.metrics || {}
 
-  const totalSales = vendors.reduce((sum, v) => sum + v.totalSales, 0)
-  const totalCommission = vendors.reduce(
+  const totalSales = metrics.totalSales ?? vendors.reduce((sum, v) => sum + v.totalSales, 0)
+  const totalCommission = metrics.totalCommission ?? vendors.reduce(
     (sum, v) => sum + calculateCommission(v.totalSales, v.commissionType, v.commissionValue),
     0
   )
-  const totalSettled = settlements
+  const totalSettled = metrics.totalSettled ?? settlements
     .filter((s) => s.status === 'completed')
     .reduce((sum, s) => sum + s.netAmount, 0)
-  const pendingCount = products.filter((p) => p.status === 'pending').length
-  const activeVendors = vendors.filter((v) => v.status === 'active').length
+  const pendingCount = metrics.pendingProducts ?? products.filter((p) => p.status === 'pending').length
+  const activeVendors = metrics.activeVendors ?? vendors.filter((v) => v.status === 'active').length
 
-  const topVendors = [...vendors]
+  const topVendors = dashboard?.topVendors || [...vendors]
     .sort((a, b) => b.totalSales - a.totalSales)
     .slice(0, 4)
 
@@ -168,7 +165,7 @@ export default function DashboardPage() {
           <h3 className="text-base font-bold text-neutral-900 mb-5">أحدث الطلبات</h3>
           <div className="space-y-2">
             {recentOrders.map((order) => {
-              const status = orderStatusMap[order.status]
+              const status = orderStatusMap[order.status] || { label: order.status || '—', class: 'badge-neutral' }
               return (
                 <div
                   key={order.id}
