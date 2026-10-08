@@ -68,6 +68,10 @@ export const adminApi = {
   vendor: (id) => request(`/vendors/${encodeURIComponent(id)}`),
   products: (page = 1, limit = 100) => request(`/products${pageQuery(page, limit, { status: 'all' })}`),
   activeProducts: (page = 1, limit = 100) => request(`/products/active${pageQuery(page, limit, { olderThanDays: '30' })}`),
+  updateProduct: (vendorId, productId, updates) => request(
+    `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}`,
+    { method: 'PATCH', body: updates },
+  ),
   settlements: (page = 1, limit = 100) => request(`/settlements${pageQuery(page, limit, { status: 'all' })}`),
   reviewProduct: (vendorId, productId, decision, reason) => request(
     `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}/review`,

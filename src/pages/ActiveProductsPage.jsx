@@ -204,8 +204,10 @@ export default function ActiveProductsPage() {
                           >
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-400 flex-shrink-0">
-                                  <Package size={18} />
+                                <div className="w-12 h-12 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-400 flex-shrink-0 overflow-hidden">
+                                  {product.imageUrl ? (
+                                    <img src={product.imageUrl} alt={product.name || 'صورة المنتج'} loading="lazy" className="w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none' }} />
+                                  ) : <Package size={18} />}
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-semibold text-neutral-900 text-sm truncate">
