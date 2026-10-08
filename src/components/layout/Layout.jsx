@@ -6,6 +6,7 @@ import TopBar from './TopBar'
 const pageMeta = {
   '/': { title: 'لوحة التحكم', subtitle: 'نظرة عامة على أداء المنصة' },
   '/vendors': { title: 'إدارة التجار', subtitle: 'قائمة بجميع التجار المسجلين في النظام' },
+  '/orders': { title: 'طلبات المتجر', subtitle: 'مراجعة الطلبات وتوجيهها للتاجر وتسجيل الشحن' },
   '/pending-products': {
     title: 'مراجعة المنتجات',
     subtitle: 'المنتجات الجديدة بانتظار موافقة الإدارة',

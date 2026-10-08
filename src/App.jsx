@@ -5,6 +5,7 @@ import { DashboardProvider, useDashboard } from './context/DashboardContext'
 import DashboardPage from './pages/DashboardPage'
 import VendorsListPage from './pages/VendorsListPage'
 import VendorDetailPage from './pages/VendorDetailPage'
+import OrdersPage from './pages/OrdersPage'
 import PendingProductsPage from './pages/PendingProductsPage'
 import ActiveProductsPage from './pages/ActiveProductsPage'
 import CommissionsPage from './pages/CommissionsPage'
@@ -53,6 +54,7 @@ function AppRoutes() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/vendors" element={<VendorsListPage />} />
           <Route path="/vendors/:id" element={<VendorDetailPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
           <Route path="/pending-products" element={<PendingProductsPage />} />
           <Route path="/active-products" element={<ActiveProductsPage />} />
           <Route path="/commissions" element={<CommissionsPage />} />
