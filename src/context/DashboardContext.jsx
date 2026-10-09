@@ -104,6 +104,18 @@ export function DashboardProvider({ children }) {
     )
   }, [findProduct, runMutation, showToast])
 
+  const updateProduct = useCallback((productId, updates) => {
+    const product = findProduct(productId)
+    if (!product) {
+      showToast('error', 'تعذر العثور على المنتج المطلوب.')
+      return Promise.resolve(null)
+    }
+    return runMutation(
+      () => adminApi.updateProduct(product.vendorId, product.id, updates),
+      'تم حفظ تعديلات المنتج. يمكنك مراجعته ثم الموافقة عليه.'
+    )
+  }, [findProduct, runMutation, showToast])
+
   const updateCommission = useCallback((vendorId, commissionType, commissionValue) => (
     runMutation(
       () => adminApi.updateCommission(vendorId, commissionType, Number(commissionValue)),
@@ -167,6 +179,7 @@ export function DashboardProvider({ children }) {
     hideToast,
     approveProduct,
     rejectProduct,
+    updateProduct,
     updateCommission,
     updateVendorStatus,
     createSettlement,
