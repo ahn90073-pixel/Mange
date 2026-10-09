@@ -1,4 +1,5 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { LoaderCircle, RefreshCw } from 'lucide-react'
 import Layout from './components/layout/Layout'
 import { DashboardProvider, useDashboard } from './context/DashboardContext'
@@ -11,6 +12,7 @@ import ActiveProductsPage from './pages/ActiveProductsPage'
 import CommissionsPage from './pages/CommissionsPage'
 import SettlementsPage from './pages/SettlementsPage'
 import Toast from './components/ui/Toast'
+import { exitAndroidApp, registerAndroidBackButton } from './utils/androidBackButton'
 
 function LoadingScreen({ label }) {
   return (
@@ -39,6 +41,21 @@ function LoadFailure({ error, onRetry }) {
 
 function AppRoutes() {
   const { toast, hideToast, loading, dataReady, loadError, refresh } = useDashboard()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    let active = true
+    let removeListener = () => {}
+    registerAndroidBackButton(() => {
+      if (location.pathname !== '/') return navigate(-1)
+      return exitAndroidApp()
+    }).then((remove) => {
+      if (active) removeListener = remove
+      else remove()
+    })
+    return () => { active = false; removeListener() }
+  }, [location.pathname, navigate])
 
   let content
   if (!dataReady && loading) {
