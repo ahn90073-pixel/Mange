@@ -172,7 +172,7 @@ function OrderDetails({ order, onClose, onUpdated }) {
 }
 
 export default function OrdersPage() {
-  const { showToast, refresh } = useDashboard()
+  const { showToast, refresh, user } = useDashboard()
   const [orders, setOrders] = useState([])
   const [pagination, setPagination] = useState(null)
   const [page, setPage] = useState(1)
@@ -217,8 +217,8 @@ export default function OrdersPage() {
 
   return (
     <div dir="rtl" className="space-y-5">
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-        <strong>تنبيه الخصوصية:</strong> لوحة الإدارة وواجهتها عامة بلا تسجيل دخول، ولذلك يمكن لأي زائر الوصول إلى الطلبات وبيانات العملاء. الطلبات الجديدة تُنشأ «بانتظار التأكيد»، وتُخصم كمياتها من مخزون التاجر عند تأكيد checkout.
+      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
+        <strong>نطاق العرض:</strong> {user?.role === 'employee' ? `تعرض هذه القائمة طلبات التجار في المحافظات المعيّنة لحسابك: ${user.assignedGovernorates.join('، ')}.` : 'تعرض هذه القائمة طلبات جميع التجار. صلاحيات الموظفين تُفرض من الخادم حسب محافظة التاجر.'}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

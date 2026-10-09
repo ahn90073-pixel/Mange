@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { Menu, Bell, Search, RefreshCw, X } from 'lucide-react'
+import { Menu, Bell, Search, RefreshCw, X, LogOut } from 'lucide-react'
 import { checkAndroidOtaNow } from '../../utils/androidOta'
 
-export default function TopBar({ onMenuClick, title, subtitle }) {
+export default function TopBar({ onMenuClick, title, subtitle, user, onLogout }) {
   const [otaResult, setOtaResult] = useState(null)
   const [checkingOta, setCheckingOta] = useState(false)
   const isAndroid = Capacitor.getPlatform() === 'android'
@@ -137,13 +137,16 @@ export default function TopBar({ onMenuClick, title, subtitle }) {
 
           <div className="hidden items-center gap-2.5 border-r border-white/20 pr-3 sm:flex">
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">إدارة المنصة</p>
-              <p className="text-xs text-slate-200/70">وصول عام بلا تسجيل دخول</p>
+              <p className="text-sm font-semibold text-white">{user?.fullName || 'حساب الإدارة'}</p>
+              <p className="text-xs text-slate-200/70">{user?.role === 'super_admin' ? 'الأدمن العام' : 'موظف'}</p>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-300 text-sm font-bold text-[#102b4a] ring-2 ring-white/20">
-              م
+              {(user?.fullName || 'م').slice(0, 1)}
             </div>
           </div>
+          <button type="button" onClick={onLogout} className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-sm text-white/90 transition-colors hover:bg-white/10" title="تسجيل الخروج">
+            <LogOut size={17} /><span className="hidden sm:inline">خروج</span>
+          </button>
         </div>
       </div>
       <div className="h-1 bg-gradient-to-r from-transparent via-amber-300 to-transparent" />

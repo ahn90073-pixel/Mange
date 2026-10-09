@@ -19,7 +19,8 @@ import {
 import { vendorStatusMap } from '../data/mockData'
 
 export default function VendorsListPage() {
-  const { vendors } = useDashboard()
+  const { vendors, user } = useDashboard()
+  const isSuperAdmin = user?.role === 'super_admin'
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -74,10 +75,12 @@ export default function VendorsListPage() {
                 <th className="text-right font-semibold px-5 py-3.5">التاجر</th>
                 <th className="text-right font-semibold px-5 py-3.5">معلومات الاتصال</th>
                 <th className="text-right font-semibold px-5 py-3.5">الحالة</th>
-                <th className="text-right font-semibold px-5 py-3.5">المبيعات</th>
-                <th className="text-right font-semibold px-5 py-3.5">العمولة</th>
-                <th className="text-right font-semibold px-5 py-3.5">الصافي المستحق</th>
-                <th className="text-right font-semibold px-5 py-3.5">المنتجات</th>
+                {isSuperAdmin ? <>
+                  <th className="text-right font-semibold px-5 py-3.5">المبيعات</th>
+                  <th className="text-right font-semibold px-5 py-3.5">العمولة</th>
+                  <th className="text-right font-semibold px-5 py-3.5">الصافي المستحق</th>
+                  <th className="text-right font-semibold px-5 py-3.5">المنتجات</th>
+                </> : <th className="text-right font-semibold px-5 py-3.5">الطلبات</th>}
                 <th className="text-center font-semibold px-5 py-3.5">إجراء</th>
               </tr>
             </thead>
@@ -126,6 +129,7 @@ export default function VendorsListPage() {
                     <td className="px-5 py-4">
                       <span className={status.class}>{status.label}</span>
                     </td>
+                    {isSuperAdmin ? <>
                     <td className="px-5 py-4">
                       <p className="font-bold text-neutral-900">
                         {formatCurrency(vendor.totalSales)}
@@ -163,6 +167,7 @@ export default function VendorsListPage() {
                         </p>
                       )}
                     </td>
+                    </> : <td className="px-5 py-4 font-semibold text-neutral-800">{formatNumber(vendor.totalOrders)} طلب</td>}
                     <td className="px-5 py-4 text-center">
                       <Link
                         to={`/vendors/${vendor.id}`}
