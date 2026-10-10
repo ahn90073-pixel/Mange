@@ -7,6 +7,7 @@ import {
   Percent,
   Receipt,
   ShoppingBag,
+  Users,
   X,
 } from 'lucide-react'
 
@@ -14,13 +15,16 @@ const navItems = [
   { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true },
   { to: '/vendors', label: 'إدارة التجار', icon: Store },
   { to: '/orders', label: 'طلبات المتجر', icon: ShoppingBag },
-  { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck },
-  { to: '/active-products', label: 'منتجات قديمة', icon: PackageX },
-  { to: '/commissions', label: 'إدارة العمولات', icon: Percent },
-  { to: '/settlements', label: 'السدادات المالية', icon: Receipt },
+  { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck, superAdminOnly: true },
+  { to: '/active-products', label: 'منتجات قديمة', icon: PackageX, superAdminOnly: true },
+  { to: '/commissions', label: 'إدارة العمولات', icon: Percent, superAdminOnly: true },
+  { to: '/settlements', label: 'السدادات المالية', icon: Receipt, superAdminOnly: true },
+  { to: '/employees', label: 'إدارة الموظفين', icon: Users, superAdminOnly: true },
 ]
 
-export default function Sidebar({ open, onClose }) {
+export default function Sidebar({ open, onClose, user }) {
+  const visibleItems = navItems.filter((item) => !item.superAdminOnly || user?.role === 'super_admin')
+  const roleLabel = user?.role === 'super_admin' ? 'الأدمن العام' : 'موظف'
   return (
     <>
       {/* Mobile overlay */}
@@ -64,7 +68,7 @@ export default function Sidebar({ open, onClose }) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon
             return (
               <NavLink
@@ -91,14 +95,14 @@ export default function Sidebar({ open, onClose }) {
         <div className="px-3 py-4 border-t border-neutral-800">
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-neutral-800/50">
             <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-bold">
-              م
+              {(user?.fullName || 'م').slice(0, 1)}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">
-                إدارة المنصة
+                {user?.fullName || 'حساب الإدارة'}
               </p>
               <p className="text-neutral-400 text-xs truncate">
-                وصول عام بلا تسجيل دخول
+                {user?.role === 'employee' ? user.assignedGovernorates.join('، ') : roleLabel}
               </p>
             </div>
           </div>

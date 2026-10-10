@@ -1,5 +1,6 @@
 const DEFAULT_API_BASE = 'https://mangerbackend.ahn90073.workers.dev/api/admin'
 const API_BASE = (import.meta.env.VITE_ADMIN_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
+const TOKEN_KEY = 'mange-admin-session-token'
 
 const localizedErrors = {
   'Internal server error': 'حدث خطأ داخلي في الخادم. حاول مرة أخرى.',
@@ -14,19 +15,40 @@ export class ApiError extends Error {
   }
 }
 
+export function getSessionToken() {
+  try {
+    return window.sessionStorage.getItem(TOKEN_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+export function setSessionToken(token) {
+  try {
+    if (token) window.sessionStorage.setItem(TOKEN_KEY, token)
+    else window.sessionStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // Private browsing modes may reject storage; the current in-memory login still works until reload.
+  }
+}
+
 function apiMessage(payload, status) {
   const message = payload?.message || payload?.error || ''
   if (localizedErrors[message]) return localizedErrors[message]
+  if (status === 401) return message || 'انتهت جلسة الدخول. سجّل الدخول مجددًا.'
+  if (status === 403) return message || 'ليس لديك صلاحية لتنفيذ هذه العملية.'
   if (status === 404) return 'العنصر المطلوب غير موجود.'
   if (status >= 500) return 'تعذر إكمال الطلب بسبب مشكلة في الخادم.'
   return message || 'تعذر إكمال الطلب.'
 }
 
-async function request(path, { method = 'GET', body } = {}) {
+async function request(path, { method = 'GET', body, auth = true } = {}) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 25000)
   const headers = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const token = auth ? getSessionToken() : ''
+  if (token) headers.Authorization = `Bearer ${token}`
 
   try {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -37,6 +59,10 @@ async function request(path, { method = 'GET', body } = {}) {
     })
     const payload = await response.json().catch(() => null)
     if (!response.ok || payload?.success === false) {
+      if (response.status === 401 && token) {
+        setSessionToken('')
+        window.dispatchEvent(new Event('mange:auth-expired'))
+      }
       throw new ApiError(apiMessage(payload, response.status), response.status)
     }
     return payload?.data ?? payload
@@ -57,6 +83,14 @@ function pageQuery(page, limit = 100, extra = {}) {
 }
 
 export const adminApi = {
+  login: (credentials) => request('/auth/login', { method: 'POST', body: credentials, auth: false }),
+  me: () => request('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  employees: () => request('/employees'),
+  createEmployee: (employee) => request('/employees', { method: 'POST', body: employee }),
+  updateEmployeeStatus: (id, isActive) => request(`/employees/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH', body: { isActive },
+  }),
   dashboard: () => request('/dashboard'),
   orders: (page = 1, limit = 100, status = 'all', q = '') => request(`/orders${pageQuery(page, limit, { status, q })}`),
   order: (vendorId, orderId) => request(`/orders/${encodeURIComponent(vendorId)}/${encodeURIComponent(orderId)}`),
@@ -66,6 +100,10 @@ export const adminApi = {
   ),
   vendors: (page = 1, limit = 100) => request(`/vendors${pageQuery(page, limit)}`),
   vendor: (id) => request(`/vendors/${encodeURIComponent(id)}`),
+  updateVendorGovernorate: (vendorId, governorate) => request(
+    `/vendors/${encodeURIComponent(vendorId)}/governorate`,
+    { method: 'PATCH', body: { governorate } },
+  ),
   products: (page = 1, limit = 100) => request(`/products${pageQuery(page, limit, { status: 'all' })}`),
   activeProducts: (page = 1, limit = 100) => request(`/products/active${pageQuery(page, limit, { olderThanDays: '30' })}`),
   updateProduct: (vendorId, productId, updates) => request(
@@ -85,10 +123,7 @@ export const adminApi = {
     `/vendors/${encodeURIComponent(vendorId)}/commission`,
     { method: 'PATCH', body: { type, value } },
   ),
-  createSettlement: (settlement) => request('/settlements', {
-    method: 'POST',
-    body: settlement,
-  }),
+  createSettlement: (settlement) => request('/settlements', { method: 'POST', body: settlement }),
   keepProduct: (vendorId, productId) => request(
     `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}/keep`,
     { method: 'PATCH', body: {} },

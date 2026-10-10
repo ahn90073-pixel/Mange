@@ -25,11 +25,13 @@ import {
 } from '../utils/format'
 import { vendorStatusMap } from '../data/mockData'
 import { generateVendorReportPDF } from '../utils/pdfGenerator'
+import { EGYPT_GOVERNORATES } from '../data/egyptGovernorates'
 
 export default function VendorDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { vendors, settlements, updateVendorStatus, user } = useDashboard()
+  const { vendors, settlements, updateVendorStatus, updateVendorGovernorate, user } = useDashboard()
+  const isSuperAdmin = user?.role === 'super_admin'
 
   const vendor = vendors.find((v) => v.id === id)
 
@@ -111,13 +113,13 @@ export default function VendorDetailPage() {
               <p className="text-primary-100 text-sm">{vendor.merchantName} · {vendor.id}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button
+              {isSuperAdmin && <button
                 onClick={() => generateVendorReportPDF(vendor, user)}
                 className="btn bg-white/15 text-white hover:bg-white/25 backdrop-blur"
               >
                 <FileText size={16} />
                 تحميل التقرير PDF
-              </button>
+              </button>}
               {vendor.status === 'active' ? (
                 <button
                   onClick={() => updateVendorStatus(vendor.id, 'suspended')}
@@ -158,8 +160,13 @@ export default function VendorDetailPage() {
           <div className="bg-white p-4 flex items-center gap-3">
             <MapPin size={18} className="text-neutral-400" />
             <div>
-              <p className="text-xs text-neutral-500">المدينة</p>
-              <p className="text-sm font-medium text-neutral-800">{vendor.city}</p>
+              <p className="text-xs text-neutral-500">المحافظة</p>
+              {isSuperAdmin ? (
+                <select className="input mt-1 max-w-52" value={vendor.governorate || ''} onChange={(event) => updateVendorGovernorate(vendor.id, event.target.value)} aria-label="محافظة التاجر">
+                  <option value="">لم تحدد بعد</option>
+                  {EGYPT_GOVERNORATES.map((governorate) => <option key={governorate} value={governorate}>{governorate}</option>)}
+                </select>
+              ) : <p className="text-sm font-medium text-neutral-800">{vendor.governorate || 'غير محددة'}</p>}
             </div>
           </div>
           <div className="bg-white p-4 flex items-center gap-3">
@@ -173,7 +180,7 @@ export default function VendorDetailPage() {
       </div>
 
       {/* Financial overview */}
-      <div>
+      {isSuperAdmin && <div>
         <h3 className="text-base font-bold text-neutral-900 mb-4">الحساب المالي</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {financialCards.map((card, i) => {
@@ -196,10 +203,11 @@ export default function VendorDetailPage() {
             )
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Quick stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 ${isSuperAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-4`}>
+        {isSuperAdmin && <>
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
             <Package size={24} />
@@ -218,6 +226,7 @@ export default function VendorDetailPage() {
             <p className="text-sm text-neutral-500">منتجات بانتظار المراجعة</p>
           </div>
         </div>
+        </>}
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-success-50 flex items-center justify-center text-success-600">
             <ShoppingCart size={24} />
@@ -230,7 +239,7 @@ export default function VendorDetailPage() {
       </div>
 
       {/* Settlements history */}
-      <div className="card p-6">
+      {isSuperAdmin && <div className="card p-6">
         <h3 className="text-base font-bold text-neutral-900 mb-4">سجل السدادات المالية</h3>
         {vendorSettlements.length === 0 ? (
           <div className="text-center py-8 text-neutral-400">
@@ -271,7 +280,7 @@ export default function VendorDetailPage() {
             </table>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

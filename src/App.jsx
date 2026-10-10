@@ -1,8 +1,11 @@
-import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
 import { LoaderCircle, RefreshCw } from 'lucide-react'
 import Layout from './components/layout/Layout'
 import { DashboardProvider, useDashboard } from './context/DashboardContext'
+import { adminApi, getSessionToken, setSessionToken } from './api/client'
+import LoginPage from './pages/LoginPage'
+import EmployeesPage from './pages/EmployeesPage'
 import DashboardPage from './pages/DashboardPage'
 import VendorsListPage from './pages/VendorsListPage'
 import VendorDetailPage from './pages/VendorDetailPage'
@@ -39,10 +42,11 @@ function LoadFailure({ error, onRetry }) {
   )
 }
 
-function AppRoutes() {
+function AppRoutes({ user, onLogout }) {
   const { toast, hideToast, loading, dataReady, loadError, refresh } = useDashboard()
   const location = useLocation()
   const navigate = useNavigate()
+  const superAdminPage = (element) => user.role === 'super_admin' ? element : <Navigate to="/" replace />
 
   useEffect(() => {
     let active = true
@@ -66,16 +70,17 @@ function AppRoutes() {
     content = <LoadingScreen label="جارٍ تجهيز لوحة الإدارة..." />
   } else {
     content = (
-      <Layout>
+      <Layout user={user} onLogout={onLogout}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/vendors" element={<VendorsListPage />} />
           <Route path="/vendors/:id" element={<VendorDetailPage />} />
           <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/pending-products" element={<PendingProductsPage />} />
-          <Route path="/active-products" element={<ActiveProductsPage />} />
-          <Route path="/commissions" element={<CommissionsPage />} />
-          <Route path="/settlements" element={<SettlementsPage />} />
+          <Route path="/pending-products" element={superAdminPage(<PendingProductsPage />)} />
+          <Route path="/active-products" element={superAdminPage(<ActiveProductsPage />)} />
+          <Route path="/commissions" element={superAdminPage(<CommissionsPage />)} />
+          <Route path="/settlements" element={superAdminPage(<SettlementsPage />)} />
+          <Route path="/employees" element={superAdminPage(<EmployeesPage />)} />
           <Route path="*" element={<DashboardPage />} />
         </Routes>
       </Layout>
@@ -90,12 +95,55 @@ function AppRoutes() {
   )
 }
 
+function AuthenticatedApp() {
+  const [user, setUser] = useState(null)
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    const onExpired = () => {
+      setSessionToken('')
+      setUser(null)
+      setCheckingSession(false)
+    }
+    window.addEventListener('mange:auth-expired', onExpired)
+
+    const token = getSessionToken()
+    if (!token) {
+      setCheckingSession(false)
+    } else {
+      adminApi.me()
+        .then((currentUser) => { if (active) setUser(currentUser) })
+        .catch(() => { if (active) setSessionToken('') })
+        .finally(() => { if (active) setCheckingSession(false) })
+    }
+    return () => {
+      active = false
+      window.removeEventListener('mange:auth-expired', onExpired)
+    }
+  }, [])
+
+  const login = useCallback(async (credentials) => {
+    const session = await adminApi.login(credentials)
+    setSessionToken(session.token)
+    setUser(session.user)
+  }, [])
+
+  const logout = useCallback(async () => {
+    try { await adminApi.logout() } catch { /* Expired sessions are cleared locally as well. */ }
+    setSessionToken('')
+    setUser(null)
+  }, [])
+
+  if (checkingSession) return <LoadingScreen label="جارٍ التحقق من جلسة الدخول..." />
+  if (!user) return <LoginPage onLogin={login} />
+  return <DashboardProvider user={user}><AppRoutes user={user} onLogout={logout} /></DashboardProvider>
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <DashboardProvider>
-        <AppRoutes />
-      </DashboardProvider>
+      <AuthenticatedApp />
     </BrowserRouter>
   )
 }

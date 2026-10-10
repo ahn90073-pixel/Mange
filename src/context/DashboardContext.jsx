@@ -23,7 +23,7 @@ const emptyData = {
   settlements: [],
 }
 
-export function DashboardProvider({ children }) {
+export function DashboardProvider({ children, user }) {
   const [loading, setLoading] = useState(false)
   const [dataReady, setDataReady] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -37,12 +37,13 @@ export function DashboardProvider({ children }) {
     if (showSpinner) setLoading(true)
     setLoadError('')
     try {
+      const isSuperAdmin = user?.role === 'super_admin'
       const [dashboard, vendors, products, activeProducts, settlements] = await Promise.all([
         adminApi.dashboard(),
         fetchAllPages((page, limit) => adminApi.vendors(page, limit)),
-        fetchAllPages((page, limit) => adminApi.products(page, limit)),
-        fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)),
-        fetchAllPages((page, limit) => adminApi.settlements(page, limit)),
+        isSuperAdmin ? fetchAllPages((page, limit) => adminApi.products(page, limit)) : Promise.resolve([]),
+        isSuperAdmin ? fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)) : Promise.resolve([]),
+        isSuperAdmin ? fetchAllPages((page, limit) => adminApi.settlements(page, limit)) : Promise.resolve([]),
       ])
       setData({ dashboard, vendors, products, activeProducts, settlements })
       setDataReady(true)
@@ -53,7 +54,7 @@ export function DashboardProvider({ children }) {
     } finally {
       if (showSpinner) setLoading(false)
     }
-  }, [])
+  }, [user?.role])
 
   useEffect(() => {
     void loadData(true)
@@ -130,6 +131,13 @@ export function DashboardProvider({ children }) {
     )
   ), [runMutation])
 
+  const updateVendorGovernorate = useCallback((vendorId, governorate) => (
+    runMutation(
+      () => adminApi.updateVendorGovernorate(vendorId, governorate || null),
+      'تم تحديث محافظة التاجر.'
+    )
+  ), [runMutation])
+
   const createSettlement = useCallback((vendorId, amount, period, method) => (
     runMutation(
       () => adminApi.createSettlement({
@@ -169,6 +177,7 @@ export function DashboardProvider({ children }) {
 
   const value = {
     ...data,
+    user,
     recentOrders: data.dashboard?.recentOrders || [],
     loading,
     dataReady,
@@ -182,6 +191,7 @@ export function DashboardProvider({ children }) {
     updateProduct,
     updateCommission,
     updateVendorStatus,
+    updateVendorGovernorate,
     createSettlement,
     deleteActiveProduct,
     keepActiveProduct,
