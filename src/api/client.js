@@ -84,6 +84,7 @@ function pageQuery(page, limit = 100, extra = {}) {
 
 export const adminApi = {
   login: (credentials) => request('/auth/login', { method: 'POST', body: credentials, auth: false }),
+  firebaseLogin: (idToken) => request('/auth/firebase-login', { method: 'POST', body: { idToken }, auth: false }),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
   employees: () => request('/employees'),
