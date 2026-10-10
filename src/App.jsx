@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout'
 import { DashboardProvider, useDashboard } from './context/DashboardContext'
 import { adminApi, getSessionToken, setSessionToken } from './api/client'
 import LoginPage from './pages/LoginPage'
+import { sendFirebaseAdminPasswordReset, signInFirebaseAdmin, signOutFirebaseAdmin } from './firebase/auth'
 import EmployeesPage from './pages/EmployeesPage'
 import DashboardPage from './pages/DashboardPage'
 import VendorsListPage from './pages/VendorsListPage'
@@ -123,20 +124,33 @@ function AuthenticatedApp() {
     }
   }, [])
 
-  const login = useCallback(async (credentials) => {
+  const loginEmployee = useCallback(async (credentials) => {
     const session = await adminApi.login(credentials)
     setSessionToken(session.token)
     setUser(session.user)
   }, [])
 
+  const loginAdmin = useCallback(async ({ email, password }) => {
+    const idToken = await signInFirebaseAdmin(email, password)
+    try {
+      const session = await adminApi.firebaseLogin(idToken)
+      setSessionToken(session.token)
+      setUser(session.user)
+    } catch (error) {
+      await signOutFirebaseAdmin().catch(() => {})
+      throw error
+    }
+  }, [])
+
   const logout = useCallback(async () => {
     try { await adminApi.logout() } catch { /* Expired sessions are cleared locally as well. */ }
+    await signOutFirebaseAdmin().catch(() => {})
     setSessionToken('')
     setUser(null)
   }, [])
 
   if (checkingSession) return <LoadingScreen label="جارٍ التحقق من جلسة الدخول..." />
-  if (!user) return <LoginPage onLogin={login} />
+  if (!user) return <LoginPage onAdminLogin={loginAdmin} onEmployeeLogin={loginEmployee} onAdminPasswordReset={sendFirebaseAdminPasswordReset} />
   return <DashboardProvider user={user}><AppRoutes user={user} onLogout={logout} /></DashboardProvider>
 }
 
