@@ -2,10 +2,10 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider, browserSessionPersistence, setPersistence, signInWithPopup, signOut } from 'firebase/auth'
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyDnHE-oYAdjNUckPUX2CSPtA4ZUiDCDLw',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'manger-301.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'manger-301',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:126525162731:web:71d43fefcbf75fffb56aae',
 }
 
 const isConfigured = Object.values(firebaseConfig).every((value) => typeof value === 'string' && value.trim())
