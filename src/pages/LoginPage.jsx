@@ -50,7 +50,7 @@ export default function LoginPage({ onLogin, onGoogleLogin }) {
               {googleSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : <GoogleMark />}
               {googleSubmitting ? 'جارٍ التحقق من حساب Google...' : 'تسجيل دخول الأدمن باستخدام Google'}
             </button>
-            <p className="mt-2 text-center text-xs leading-5 text-neutral-500">متاح لعناوين Gmail المعتمدة للأدمن فقط (بحد أقصى 3 حسابات).</p>
+            <p className="mt-2 text-center text-xs leading-5 text-neutral-500">أول ثلاثة حسابات Google موثّقة غير مسجلة كموظفين تحصل على صلاحية الأدمن؛ بعدها يُغلق التسجيل.</p>
           </div>
 
           <div className="flex items-center gap-3 text-xs text-neutral-400"><span className="h-px flex-1 bg-neutral-200" /><span>دخول الموظفين</span><span className="h-px flex-1 bg-neutral-200" /></div>
