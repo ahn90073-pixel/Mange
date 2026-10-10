@@ -4,6 +4,7 @@ import { LoaderCircle, RefreshCw } from 'lucide-react'
 import Layout from './components/layout/Layout'
 import { DashboardProvider, useDashboard } from './context/DashboardContext'
 import { adminApi, getSessionToken, setSessionToken } from './api/client'
+import { signInWithGoogle, signOutGoogle } from './lib/firebase'
 import LoginPage from './pages/LoginPage'
 import EmployeesPage from './pages/EmployeesPage'
 import DashboardPage from './pages/DashboardPage'
@@ -129,14 +130,27 @@ function AuthenticatedApp() {
     setUser(session.user)
   }, [])
 
+  const loginGoogle = useCallback(async () => {
+    const idToken = await signInWithGoogle()
+    try {
+      const session = await adminApi.googleLogin(idToken)
+      setSessionToken(session.token)
+      setUser(session.user)
+    } catch (error) {
+      await signOutGoogle().catch(() => {})
+      throw error
+    }
+  }, [])
+
   const logout = useCallback(async () => {
     try { await adminApi.logout() } catch { /* Expired sessions are cleared locally as well. */ }
+    await signOutGoogle().catch(() => {})
     setSessionToken('')
     setUser(null)
   }, [])
 
   if (checkingSession) return <LoadingScreen label="جارٍ التحقق من جلسة الدخول..." />
-  if (!user) return <LoginPage onLogin={login} />
+  if (!user) return <LoginPage onLogin={login} onGoogleLogin={loginGoogle} />
   return <DashboardProvider user={user}><AppRoutes user={user} onLogout={logout} /></DashboardProvider>
 }
 
