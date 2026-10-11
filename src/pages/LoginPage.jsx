@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { LoaderCircle, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
+import { LoaderCircle, LockKeyhole, Mail, RefreshCw, ShieldCheck } from 'lucide-react'
+import { checkAndroidOtaNow } from '../utils/androidOta'
 
 export default function LoginPage({ onLogin, onGoogleLogin }) {
   const [email, setEmail] = useState('')
@@ -7,6 +9,9 @@ export default function LoginPage({ onLogin, onGoogleLogin }) {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [googleSubmitting, setGoogleSubmitting] = useState(false)
+  const [otaResult, setOtaResult] = useState(null)
+  const [checkingOta, setCheckingOta] = useState(false)
+  const isAndroid = Capacitor.getPlatform() === 'android'
 
   const submit = async (event) => {
     event.preventDefault()
@@ -33,7 +38,23 @@ export default function LoginPage({ onLogin, onGoogleLogin }) {
     }
   }
 
-  const busy = submitting || googleSubmitting
+  const checkOtaUpdates = async () => {
+    setCheckingOta(true)
+    setOtaResult({ status: 'checking', message: 'جارٍ فحص التحديثات الهوائية...' })
+    try {
+      setOtaResult(await checkAndroidOtaNow())
+    } catch (updateError) {
+      setOtaResult({
+        status: 'error',
+        message: 'تعذر فحص التحديث الهوائي.',
+        details: updateError instanceof Error ? updateError.message : String(updateError),
+      })
+    } finally {
+      setCheckingOta(false)
+    }
+  }
+
+  const busy = submitting || googleSubmitting || checkingOta
 
   return (
     <main dir="rtl" className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#102b4a] via-[#183e66] to-[#0b1e34] px-4 py-10">
@@ -65,6 +86,26 @@ export default function LoginPage({ onLogin, onGoogleLogin }) {
             </label>
             <button type="submit" disabled={busy} className="btn-primary w-full py-3 disabled:cursor-wait disabled:opacity-60">{submitting ? <LoaderCircle size={18} className="animate-spin" /> : <LockKeyhole size={18} />}{submitting ? 'جارٍ التحقق...' : 'دخول الموظف'}</button>
           </form>
+          {isAndroid && (
+            <div className="border-t border-neutral-100 pt-4">
+              <button
+                type="button"
+                onClick={checkOtaUpdates}
+                disabled={busy}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm font-semibold text-primary-800 transition hover:bg-primary-100 disabled:cursor-wait disabled:opacity-60"
+              >
+                {checkingOta ? <LoaderCircle size={17} className="animate-spin" /> : <RefreshCw size={17} />}
+                {checkingOta ? 'جارٍ فحص التحديثات الهوائية...' : 'فحص التحديثات الهوائية'}
+              </button>
+              <p className="mt-2 text-center text-xs leading-5 text-neutral-500">يمكنك فحص التحديث قبل تسجيل الدخول. إذا تم تنزيل تحديث، أغلق التطبيق وافتحه مجددًا لتطبيقه.</p>
+              {otaResult && (
+                <div role="status" aria-live="polite" className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-700">
+                  <p className="font-semibold">{otaResult.message}</p>
+                  {otaResult.details && <p className="mt-1 break-words text-xs opacity-80">{otaResult.details}</p>}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </main>
