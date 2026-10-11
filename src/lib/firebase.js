@@ -18,6 +18,9 @@ const useNativeGoogleAuth = Capacitor.getPlatform() === 'android'
 
 export async function signInWithGoogle() {
   if (useNativeGoogleAuth) {
+    if (!Capacitor.isPluginAvailable('FirebaseAuthentication')) {
+      throw new Error('حدّث تطبيق Android إلى أحدث إصدار قبل تسجيل الدخول باستخدام Google.')
+    }
     await FirebaseAuthentication.signInWithGoogle()
     const { token } = await FirebaseAuthentication.getIdToken()
     if (!token) throw new Error('تعذر استرجاع رمز Firebase من تسجيل Google.')
