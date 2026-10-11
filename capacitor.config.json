@@ -6,6 +6,10 @@
     "CapacitorUpdater": {
       "autoUpdate": false,
       "statsUrl": ""
+    },
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"]
     }
   }
 }

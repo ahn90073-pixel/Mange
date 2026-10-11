@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "126525162731",
+    "project_id": "manger-301",
+    "storage_bucket": "manger-301.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:126525162731:android:eb07e7bfa2231baeb56aae",
+        "android_client_info": {
+          "package_name": "com.ahn90073.mange"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "126525162731-ri8sa01er01mgr6s04kiosf9ekg8bhdc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ahn90073.mange",
+            "certificate_hash": "5e70a32dc8e851f20e277ef1b18b77e4d95bfc08"
+          }
+        },
+        {
+          "client_id": "126525162731-3btpq5hedur3bd64m2toh3q33tt4250h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbFHghPkxt9JWFfONyh-nlPJZS8T37Jqg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "126525162731-3btpq5hedur3bd64m2toh3q33tt4250h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
