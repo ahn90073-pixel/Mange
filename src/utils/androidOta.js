@@ -6,7 +6,7 @@ const OTA_RELEASE_API =
 const OTA_ASSET_NAME = 'dist.zip'
 const SUCCESSFUL_CHECK_KEY = 'mange.android-ota.last-success'
 const LAST_ATTEMPT_KEY = 'mange.android-ota.last-attempt'
-const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+const CHECK_INTERVAL_MS = 60 * 60 * 1000
 const RETRY_INTERVAL_MS = 2 * 60 * 1000
 
 let checkInFlight
