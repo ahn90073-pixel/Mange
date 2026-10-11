@@ -38,7 +38,7 @@ function apiMessage(payload, status) {
   if (status === 401) return message || 'انتهت جلسة الدخول. سجّل الدخول مجددًا.'
   if (status === 403) return message || 'ليس لديك صلاحية لتنفيذ هذه العملية.'
   if (status === 404) return 'العنصر المطلوب غير موجود.'
-  if (status >= 500) return 'تعذر إكمال الطلب بسبب مشكلة في الخادم.'
+  if (status >= 500) return message || 'تعذر إكمال الطلب بسبب مشكلة في الخادم.'
   return message || 'تعذر إكمال الطلب.'
 }
 
@@ -84,6 +84,7 @@ function pageQuery(page, limit = 100, extra = {}) {
 
 export const adminApi = {
   login: (credentials) => request('/auth/login', { method: 'POST', body: credentials, auth: false }),
+  googleLogin: (idToken) => request('/auth/google', { method: 'POST', body: { idToken }, auth: false }),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
   employees: () => request('/employees'),
