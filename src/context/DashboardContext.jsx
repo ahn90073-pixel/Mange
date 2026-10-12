@@ -37,13 +37,17 @@ export function DashboardProvider({ children, user }) {
     if (showSpinner) setLoading(true)
     setLoadError('')
     try {
-      const isSuperAdmin = user?.role === 'super_admin'
+      if (!['super_admin', 'employee'].includes(user?.role)) {
+        setData(emptyData)
+        setDataReady(false)
+        throw new Error('لا توجد صلاحية لعرض بيانات الإدارة.')
+      }
       const [dashboard, vendors, products, activeProducts, settlements] = await Promise.all([
         adminApi.dashboard(),
         fetchAllPages((page, limit) => adminApi.vendors(page, limit)),
-        isSuperAdmin ? fetchAllPages((page, limit) => adminApi.products(page, limit)) : Promise.resolve([]),
-        isSuperAdmin ? fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)) : Promise.resolve([]),
-        isSuperAdmin ? fetchAllPages((page, limit) => adminApi.settlements(page, limit)) : Promise.resolve([]),
+        fetchAllPages((page, limit) => adminApi.products(page, limit)),
+        fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)),
+        fetchAllPages((page, limit) => adminApi.settlements(page, limit)),
       ])
       setData({ dashboard, vendors, products, activeProducts, settlements })
       setDataReady(true)

@@ -20,7 +20,7 @@ import { vendorStatusMap } from '../data/mockData'
 
 export default function VendorsListPage() {
   const { vendors, user } = useDashboard()
-  const isSuperAdmin = user?.role === 'super_admin'
+  const hasFullAccess = user?.role === 'super_admin' || user?.role === 'employee'
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -75,7 +75,7 @@ export default function VendorsListPage() {
                 <th className="text-right font-semibold px-5 py-3.5">التاجر</th>
                 <th className="text-right font-semibold px-5 py-3.5">معلومات الاتصال</th>
                 <th className="text-right font-semibold px-5 py-3.5">الحالة</th>
-                {isSuperAdmin ? <>
+                {hasFullAccess ? <>
                   <th className="text-right font-semibold px-5 py-3.5">المبيعات</th>
                   <th className="text-right font-semibold px-5 py-3.5">العمولة</th>
                   <th className="text-right font-semibold px-5 py-3.5">الصافي المستحق</th>
@@ -129,7 +129,7 @@ export default function VendorsListPage() {
                     <td className="px-5 py-4">
                       <span className={status.class}>{status.label}</span>
                     </td>
-                    {isSuperAdmin ? <>
+                    {hasFullAccess ? <>
                     <td className="px-5 py-4">
                       <p className="font-bold text-neutral-900">
                         {formatCurrency(vendor.totalSales)}

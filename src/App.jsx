@@ -47,7 +47,6 @@ function AppRoutes({ user, onLogout }) {
   const { toast, hideToast, loading, dataReady, loadError, refresh } = useDashboard()
   const location = useLocation()
   const navigate = useNavigate()
-  const superAdminPage = (element) => user.role === 'super_admin' ? element : <Navigate to="/" replace />
 
   useEffect(() => {
     let active = true
@@ -77,11 +76,11 @@ function AppRoutes({ user, onLogout }) {
           <Route path="/vendors" element={<VendorsListPage />} />
           <Route path="/vendors/:id" element={<VendorDetailPage />} />
           <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/pending-products" element={superAdminPage(<PendingProductsPage />)} />
-          <Route path="/active-products" element={superAdminPage(<ActiveProductsPage />)} />
-          <Route path="/commissions" element={superAdminPage(<CommissionsPage />)} />
-          <Route path="/settlements" element={superAdminPage(<SettlementsPage />)} />
-          <Route path="/employees" element={superAdminPage(<EmployeesPage />)} />
+          <Route path="/pending-products" element={<PendingProductsPage />} />
+          <Route path="/active-products" element={<ActiveProductsPage />} />
+          <Route path="/commissions" element={<CommissionsPage />} />
+          <Route path="/settlements" element={<SettlementsPage />} />
+          <Route path="/employees" element={user.role === 'super_admin' ? <EmployeesPage /> : <Navigate to="/" replace />} />
           <Route path="*" element={<DashboardPage />} />
         </Routes>
       </Layout>

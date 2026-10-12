@@ -15,10 +15,10 @@ const navItems = [
   { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true },
   { to: '/vendors', label: 'إدارة التجار', icon: Store },
   { to: '/orders', label: 'طلبات المتجر', icon: ShoppingBag },
-  { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck, superAdminOnly: true },
-  { to: '/active-products', label: 'منتجات قديمة', icon: PackageX, superAdminOnly: true },
-  { to: '/commissions', label: 'إدارة العمولات', icon: Percent, superAdminOnly: true },
-  { to: '/settlements', label: 'السدادات المالية', icon: Receipt, superAdminOnly: true },
+  { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck },
+  { to: '/active-products', label: 'منتجات قديمة', icon: PackageX },
+  { to: '/commissions', label: 'إدارة العمولات', icon: Percent },
+  { to: '/settlements', label: 'السدادات المالية', icon: Receipt },
   { to: '/employees', label: 'إدارة الموظفين', icon: Users, superAdminOnly: true },
 ]
 

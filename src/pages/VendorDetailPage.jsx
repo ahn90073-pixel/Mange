@@ -113,13 +113,13 @@ export default function VendorDetailPage() {
               <p className="text-primary-100 text-sm">{vendor.merchantName} · {vendor.id}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
-              {isSuperAdmin && <button
+              <button
                 onClick={() => generateVendorReportPDF(vendor, user)}
                 className="btn bg-white/15 text-white hover:bg-white/25 backdrop-blur"
               >
                 <FileText size={16} />
                 تحميل التقرير PDF
-              </button>}
+              </button>
               {vendor.status === 'active' ? (
                 <button
                   onClick={() => updateVendorStatus(vendor.id, 'suspended')}
@@ -180,7 +180,7 @@ export default function VendorDetailPage() {
       </div>
 
       {/* Financial overview */}
-      {isSuperAdmin && <div>
+      <div>
         <h3 className="text-base font-bold text-neutral-900 mb-4">الحساب المالي</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {financialCards.map((card, i) => {
@@ -203,11 +203,10 @@ export default function VendorDetailPage() {
             )
           })}
         </div>
-      </div>}
+      </div>
 
       {/* Quick stats */}
-      <div className={`grid grid-cols-1 ${isSuperAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-4`}>
-        {isSuperAdmin && <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
             <Package size={24} />
@@ -226,7 +225,6 @@ export default function VendorDetailPage() {
             <p className="text-sm text-neutral-500">منتجات بانتظار المراجعة</p>
           </div>
         </div>
-        </>}
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-success-50 flex items-center justify-center text-success-600">
             <ShoppingCart size={24} />
@@ -239,7 +237,7 @@ export default function VendorDetailPage() {
       </div>
 
       {/* Settlements history */}
-      {isSuperAdmin && <div className="card p-6">
+      <div className="card p-6">
         <h3 className="text-base font-bold text-neutral-900 mb-4">سجل السدادات المالية</h3>
         {vendorSettlements.length === 0 ? (
           <div className="text-center py-8 text-neutral-400">
@@ -280,7 +278,7 @@ export default function VendorDetailPage() {
             </table>
           </div>
         )}
-      </div>}
+      </div>
     </div>
   )
 }
