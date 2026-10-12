@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+
 const DEFAULT_API_BASE = 'https://mangerbackend.ahn90073.workers.dev/api/admin'
 const API_BASE = (import.meta.env.VITE_ADMIN_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
 const TOKEN_KEY = 'mange-admin-session-token'
@@ -17,6 +19,23 @@ export class ApiError extends Error {
 
 export function getSessionToken() {
   try {
+    if (Capacitor.getPlatform() === 'android') {
+      let persistentToken = ''
+      try {
+        persistentToken = window.localStorage.getItem(TOKEN_KEY) || ''
+      } catch {
+        return window.sessionStorage.getItem(TOKEN_KEY) || ''
+      }
+      if (persistentToken) return persistentToken
+
+      // Migrate an existing token from the old tab-scoped store on first launch.
+      const legacyToken = window.sessionStorage.getItem(TOKEN_KEY) || ''
+      if (legacyToken) {
+        window.localStorage.setItem(TOKEN_KEY, legacyToken)
+        window.sessionStorage.removeItem(TOKEN_KEY)
+      }
+      return legacyToken
+    }
     return window.sessionStorage.getItem(TOKEN_KEY) || ''
   } catch {
     return ''
@@ -24,6 +43,23 @@ export function getSessionToken() {
 }
 
 export function setSessionToken(token) {
+  if (Capacitor.getPlatform() === 'android') {
+    try {
+      if (token) window.localStorage.setItem(TOKEN_KEY, token)
+      else window.localStorage.removeItem(TOKEN_KEY)
+      window.sessionStorage.removeItem(TOKEN_KEY)
+    } catch {
+      // Fall back to the current WebView session if persistent storage is blocked.
+      try {
+        if (token) window.sessionStorage.setItem(TOKEN_KEY, token)
+        else window.sessionStorage.removeItem(TOKEN_KEY)
+      } catch {
+        // In-memory UI state still works until WebView reloads.
+      }
+    }
+    return
+  }
+
   try {
     if (token) window.sessionStorage.setItem(TOKEN_KEY, token)
     else window.sessionStorage.removeItem(TOKEN_KEY)
