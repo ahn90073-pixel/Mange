@@ -9,11 +9,13 @@ import {
   ShoppingBag,
   Users,
   ClipboardCheck,
+  Package,
   X,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true, superAdminOnly: true },
+  { to: '/product-dashboard', label: 'لوحة المنتجات', icon: Package, employeeAllowed: true, employeeOnly: true },
   { to: '/vendors', label: 'إدارة التجار', icon: Store, superAdminOnly: true },
   { to: '/store-requests', label: 'طلبات إنشاء متجر', icon: ClipboardCheck, superAdminOnly: true },
   { to: '/orders', label: 'طلبات المتجر', icon: ShoppingBag, employeeAllowed: true },
@@ -25,7 +27,7 @@ const navItems = [
 ]
 
 export default function Sidebar({ open, onClose, user }) {
-  const visibleItems = navItems.filter((item) => user?.role === 'super_admin' || item.employeeAllowed)
+  const visibleItems = navItems.filter((item) => user?.role === 'super_admin' ? !item.employeeOnly : item.employeeAllowed)
   const roleLabel = user?.role === 'super_admin' ? 'الأدمن العام' : 'موظف'
   return (
     <>

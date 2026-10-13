@@ -14,6 +14,7 @@ import VendorDetailPage from './pages/VendorDetailPage'
 import OrdersPage from './pages/OrdersPage'
 import PendingProductsPage from './pages/PendingProductsPage'
 import ActiveProductsPage from './pages/ActiveProductsPage'
+import EmployeeProductsDashboard from './pages/EmployeeProductsDashboard'
 import CommissionsPage from './pages/CommissionsPage'
 import SettlementsPage from './pages/SettlementsPage'
 import Toast from './components/ui/Toast'
@@ -73,7 +74,8 @@ function AppRoutes({ user, onLogout }) {
     content = (
       <Layout user={user} onLogout={onLogout}>
         <Routes>
-          <Route path="/" element={user.role === 'super_admin' ? <DashboardPage /> : <Navigate to="/orders" replace />} />
+          <Route path="/" element={user.role === 'super_admin' ? <DashboardPage /> : <Navigate to="/product-dashboard" replace />} />
+          <Route path="/product-dashboard" element={user.role === 'employee' ? <EmployeeProductsDashboard /> : <Navigate to="/" replace />} />
           <Route path="/vendors" element={user.role === 'super_admin' ? <VendorsListPage /> : <Navigate to="/orders" replace />} />
           <Route path="/vendors/:id" element={user.role === 'super_admin' ? <VendorDetailPage /> : <Navigate to="/orders" replace />} />
           <Route path="/store-requests" element={user.role === 'super_admin' ? <StoreRequestsPage /> : <Navigate to="/orders" replace />} />
@@ -83,7 +85,7 @@ function AppRoutes({ user, onLogout }) {
           <Route path="/commissions" element={user.role === 'super_admin' ? <CommissionsPage /> : <Navigate to="/orders" replace />} />
           <Route path="/settlements" element={user.role === 'super_admin' ? <SettlementsPage /> : <Navigate to="/orders" replace />} />
           <Route path="/employees" element={user.role === 'super_admin' ? <EmployeesPage /> : <Navigate to="/orders" replace />} />
-          <Route path="*" element={<Navigate to={user.role === 'super_admin' ? '/' : '/orders'} replace />} />
+          <Route path="*" element={<Navigate to={user.role === 'super_admin' ? '/' : '/product-dashboard'} replace />} />
         </Routes>
       </Layout>
     )
