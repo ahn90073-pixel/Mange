@@ -7,6 +7,7 @@ import { adminApi, getSessionToken, setSessionToken } from './api/client'
 import { signInWithGoogle, signOutGoogle } from './lib/firebase'
 import LoginPage from './pages/LoginPage'
 import EmployeesPage from './pages/EmployeesPage'
+import StoreRequestsPage from './pages/StoreRequestsPage'
 import DashboardPage from './pages/DashboardPage'
 import VendorsListPage from './pages/VendorsListPage'
 import VendorDetailPage from './pages/VendorDetailPage'
@@ -75,6 +76,7 @@ function AppRoutes({ user, onLogout }) {
           <Route path="/" element={user.role === 'super_admin' ? <DashboardPage /> : <Navigate to="/orders" replace />} />
           <Route path="/vendors" element={user.role === 'super_admin' ? <VendorsListPage /> : <Navigate to="/orders" replace />} />
           <Route path="/vendors/:id" element={user.role === 'super_admin' ? <VendorDetailPage /> : <Navigate to="/orders" replace />} />
+          <Route path="/store-requests" element={user.role === 'super_admin' ? <StoreRequestsPage /> : <Navigate to="/orders" replace />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/pending-products" element={<PendingProductsPage />} />
           <Route path="/active-products" element={<ActiveProductsPage />} />

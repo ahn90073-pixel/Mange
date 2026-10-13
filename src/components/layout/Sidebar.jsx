@@ -8,12 +8,14 @@ import {
   Receipt,
   ShoppingBag,
   Users,
+  ClipboardCheck,
   X,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true, superAdminOnly: true },
   { to: '/vendors', label: 'إدارة التجار', icon: Store, superAdminOnly: true },
+  { to: '/store-requests', label: 'طلبات إنشاء متجر', icon: ClipboardCheck, superAdminOnly: true },
   { to: '/orders', label: 'طلبات المتجر', icon: ShoppingBag, employeeAllowed: true },
   { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck, employeeAllowed: true },
   { to: '/active-products', label: 'منتجات قديمة', icon: PackageX, employeeAllowed: true },

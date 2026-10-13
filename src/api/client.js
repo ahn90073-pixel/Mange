@@ -124,6 +124,9 @@ export const adminApi = {
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
   employees: () => request('/employees'),
+  storeRequests: (status = 'pending', page = 1, limit = 100) => request(`/store-requests${pageQuery(page, limit, { status })}`),
+  approveStoreRequest: (id) => request(`/store-requests/${encodeURIComponent(id)}/approve`, { method: 'POST', body: {} }),
+  rejectStoreRequest: (id, adminNote = '') => request(`/store-requests/${encodeURIComponent(id)}/reject`, { method: 'POST', body: { adminNote } }),
   createEmployee: (employee) => request('/employees', { method: 'POST', body: employee }),
   updateEmployeeStatus: (id, isActive) => request(`/employees/${encodeURIComponent(id)}/status`, {
     method: 'PATCH', body: { isActive },
