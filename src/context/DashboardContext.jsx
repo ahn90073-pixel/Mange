@@ -42,14 +42,25 @@ export function DashboardProvider({ children, user }) {
         setDataReady(false)
         throw new Error('لا توجد صلاحية لعرض بيانات الإدارة.')
       }
-      const [dashboard, vendors, products, activeProducts, settlements] = await Promise.all([
-        adminApi.dashboard(),
-        fetchAllPages((page, limit) => adminApi.vendors(page, limit)),
-        fetchAllPages((page, limit) => adminApi.products(page, limit)),
-        fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)),
-        fetchAllPages((page, limit) => adminApi.settlements(page, limit)),
-      ])
-      setData({ dashboard, vendors, products, activeProducts, settlements })
+      const [dashboard, vendors, products, activeProducts, settlements] = user?.role === 'employee'
+        ? await Promise.all([
+          Promise.resolve(null),
+          Promise.resolve([]),
+          fetchAllPages((page, limit) => adminApi.products(page, limit)),
+          fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)),
+          Promise.resolve([]),
+        ])
+        : await Promise.all([
+          adminApi.dashboard(),
+          fetchAllPages((page, limit) => adminApi.vendors(page, limit)),
+          fetchAllPages((page, limit) => adminApi.products(page, limit)),
+          fetchAllPages((page, limit) => adminApi.activeProducts(page, limit)),
+          fetchAllPages((page, limit) => adminApi.settlements(page, limit)),
+        ])
+      const productVendors = user?.role === 'employee'
+        ? [...new Map(activeProducts.map((product) => [product.vendorId, { id: product.vendorId, companyName: product.vendorName }])).values()]
+        : vendors
+      setData({ dashboard, vendors: productVendors, products, activeProducts, settlements })
       setDataReady(true)
       return true
     } catch (error) {

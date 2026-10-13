@@ -15,7 +15,7 @@ import { orderStatusMap } from '../data/mockData'
 
 export default function DashboardPage() {
   const { vendors, products, settlements, dashboard, recentOrders, user } = useDashboard()
-  const hasFullAccess = user?.role === 'super_admin' || user?.role === 'employee'
+  const hasFullAccess = user?.role === 'super_admin'
   const metrics = dashboard?.metrics || {}
   const totalSales = metrics.totalSales ?? vendors.reduce((sum, vendor) => sum + (vendor.totalSales || 0), 0)
   const totalCommission = metrics.totalCommission ?? vendors.reduce(

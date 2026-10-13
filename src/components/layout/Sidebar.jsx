@@ -12,18 +12,18 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true },
-  { to: '/vendors', label: 'إدارة التجار', icon: Store },
-  { to: '/orders', label: 'طلبات المتجر', icon: ShoppingBag },
-  { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck },
-  { to: '/active-products', label: 'منتجات قديمة', icon: PackageX },
-  { to: '/commissions', label: 'إدارة العمولات', icon: Percent },
-  { to: '/settlements', label: 'السدادات المالية', icon: Receipt },
+  { to: '/', label: 'لوحة المعلومات', icon: LayoutDashboard, end: true, superAdminOnly: true },
+  { to: '/vendors', label: 'إدارة التجار', icon: Store, superAdminOnly: true },
+  { to: '/orders', label: 'طلبات المتجر', icon: ShoppingBag, employeeAllowed: true },
+  { to: '/pending-products', label: 'مراجعة المنتجات', icon: PackageCheck, employeeAllowed: true },
+  { to: '/active-products', label: 'منتجات قديمة', icon: PackageX, employeeAllowed: true },
+  { to: '/commissions', label: 'إدارة العمولات', icon: Percent, superAdminOnly: true },
+  { to: '/settlements', label: 'السدادات المالية', icon: Receipt, superAdminOnly: true },
   { to: '/employees', label: 'إدارة الموظفين', icon: Users, superAdminOnly: true },
 ]
 
 export default function Sidebar({ open, onClose, user }) {
-  const visibleItems = navItems.filter((item) => !item.superAdminOnly || user?.role === 'super_admin')
+  const visibleItems = navItems.filter((item) => user?.role === 'super_admin' || item.employeeAllowed)
   const roleLabel = user?.role === 'super_admin' ? 'الأدمن العام' : 'موظف'
   return (
     <>

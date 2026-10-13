@@ -72,16 +72,16 @@ function AppRoutes({ user, onLogout }) {
     content = (
       <Layout user={user} onLogout={onLogout}>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/vendors" element={<VendorsListPage />} />
-          <Route path="/vendors/:id" element={<VendorDetailPage />} />
+          <Route path="/" element={user.role === 'super_admin' ? <DashboardPage /> : <Navigate to="/orders" replace />} />
+          <Route path="/vendors" element={user.role === 'super_admin' ? <VendorsListPage /> : <Navigate to="/orders" replace />} />
+          <Route path="/vendors/:id" element={user.role === 'super_admin' ? <VendorDetailPage /> : <Navigate to="/orders" replace />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/pending-products" element={<PendingProductsPage />} />
           <Route path="/active-products" element={<ActiveProductsPage />} />
-          <Route path="/commissions" element={<CommissionsPage />} />
-          <Route path="/settlements" element={<SettlementsPage />} />
-          <Route path="/employees" element={user.role === 'super_admin' ? <EmployeesPage /> : <Navigate to="/" replace />} />
-          <Route path="*" element={<DashboardPage />} />
+          <Route path="/commissions" element={user.role === 'super_admin' ? <CommissionsPage /> : <Navigate to="/orders" replace />} />
+          <Route path="/settlements" element={user.role === 'super_admin' ? <SettlementsPage /> : <Navigate to="/orders" replace />} />
+          <Route path="/employees" element={user.role === 'super_admin' ? <EmployeesPage /> : <Navigate to="/orders" replace />} />
+          <Route path="*" element={<Navigate to={user.role === 'super_admin' ? '/' : '/orders'} replace />} />
         </Routes>
       </Layout>
     )
