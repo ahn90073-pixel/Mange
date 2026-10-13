@@ -125,6 +125,16 @@ export const adminApi = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   employees: () => request('/employees'),
   storeRequests: (status = 'pending', page = 1, limit = 100) => request(`/store-requests${pageQuery(page, limit, { status })}`),
+  storeRequestDocument: async (id, documentType) => {
+    const response = await fetch(`${API_BASE}/store-requests/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentType)}`, {
+      headers: { Accept: 'application/octet-stream', Authorization: `Bearer ${getSessionToken()}` },
+    })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      throw new ApiError(apiMessage(payload, response.status), response.status)
+    }
+    return response.blob()
+  },
   approveStoreRequest: (id) => request(`/store-requests/${encodeURIComponent(id)}/approve`, { method: 'POST', body: {} }),
   rejectStoreRequest: (id, adminNote = '') => request(`/store-requests/${encodeURIComponent(id)}/reject`, { method: 'POST', body: { adminNote } }),
   createEmployee: (employee) => request('/employees', { method: 'POST', body: employee }),
