@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, Clock3, Download, Eye, FileCheck2, LoaderCircle, RefreshCw, Share2, Store, X } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import { adminApi } from '../api/client'
 
 const statusLabels = { pending: 'قيد المراجعة', approved: 'تمت الموافقة', rejected: 'مرفوض' }
@@ -41,6 +42,7 @@ export default function StoreRequestsPage() {
   const [notes, setNotes] = useState({})
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const nativePlatform = Capacitor.isNativePlatform()
 
   const loadRequests = useCallback(async () => {
     setLoading(true)
@@ -87,17 +89,23 @@ export default function StoreRequestsPage() {
     setError('')
     try {
       const blob = await adminApi.storeRequestDocument(requestId, documentType)
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
       const extension = contentType === 'application/pdf' ? 'pdf' : contentType === 'image/png' ? 'png' : 'jpg'
-      anchor.download = `${documentType}.${extension}`
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 10000)
+      const fileName = `${documentType}.${extension}`
+      const file = new File([blob], fileName, { type: contentType || blob.type })
+      if (nativePlatform && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: fileName, files: [file] })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = fileName
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 30000)
+      }
     } catch (downloadError) {
-      setError(downloadError.message || 'تعذر تنزيل المستند.')
+      if (downloadError?.name !== 'AbortError') setError(downloadError.message || 'تعذر تنزيل المستند.')
     } finally {
       setBusyDocument('')
     }
@@ -111,7 +119,7 @@ export default function StoreRequestsPage() {
       const blob = await adminApi.storeRequestDocument(requestId, documentType)
       const resolvedType = contentType || blob.type
       const extension = resolvedType === 'application/pdf' ? 'pdf' : resolvedType === 'image/png' ? 'png' : 'jpg'
-      setPreview({ url: URL.createObjectURL(blob), contentType: resolvedType, label: documentLabels[documentType], fileName: `${documentType}.${extension}` })
+      setPreview({ requestId, documentType, url: URL.createObjectURL(blob), contentType: resolvedType, label: documentLabels[documentType], fileName: `${documentType}.${extension}` })
     } catch (previewError) {
       setError(previewError.message || 'تعذر فتح المستند.')
     } finally {
@@ -169,14 +177,14 @@ export default function StoreRequestsPage() {
   }
 
   return (
-    <div dir="rtl" className="space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div><h2 className="text-xl font-bold text-neutral-900">طلبات إنشاء متجر</h2><p className="mt-1 text-sm leading-6 text-neutral-500">تعرض هذه الصفحة ملف الشركة ومستنداته الخاصة. لا تُنشأ الشركة أو بيئتها المنفصلة إلا بعد اعتماد ملف مكتمل.</p></div>
-        <div className="flex gap-2">
-          <select aria-label="حالة الطلب" className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
+    <div dir="rtl" className="w-full min-w-0 max-w-full space-y-5 overflow-x-hidden sm:space-y-6">
+      <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div className="min-w-0"><h2 className="text-xl font-bold text-neutral-900">طلبات إنشاء متجر</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-500">تعرض هذه الصفحة ملف الشركة ومستنداته الخاصة. لا تُنشأ الشركة أو بيئتها المنفصلة إلا بعد اعتماد ملف مكتمل.</p></div>
+        <div className="flex w-full min-w-0 gap-2 sm:w-auto">
+          <select aria-label="حالة الطلب" className="input min-w-0 flex-1 text-base sm:w-44 sm:flex-none sm:text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="pending">قيد المراجعة</option><option value="all">كل الطلبات</option><option value="approved">المعتمدة</option><option value="rejected">المرفوضة</option>
           </select>
-          <button type="button" onClick={loadRequests} disabled={loading} className="btn-secondary" aria-label="تحديث الطلبات"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} />تحديث</button>
+          <button type="button" onClick={loadRequests} disabled={loading} className="btn-secondary shrink-0 px-3 sm:px-4" aria-label="تحديث الطلبات"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} />تحديث</button>
         </div>
       </header>
 
@@ -193,7 +201,7 @@ export default function StoreRequestsPage() {
             const address = profile.warehouseAddress || {}
             const missing = missingProfileSections(request)
             const documents = request.documents || []
-            return <article key={request.id} className="card space-y-5 p-5 sm:p-6">
+            return <article key={request.id} className="card min-w-0 space-y-4 p-3 sm:space-y-5 sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700"><Store size={20} /></span><div><h3 className="text-lg font-bold text-neutral-900">{request.storeName}</h3><p className="mt-1 text-sm text-neutral-500">أُرسل {request.createdAt ? new Date(request.createdAt).toLocaleString('ar-EG') : '—'}</p></div></div>
                 <span className={`inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${request.status === 'pending' ? 'bg-amber-50 text-amber-800' : request.status === 'approved' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}><Clock3 size={14} />{statusLabels[request.status] || request.status}</span>
@@ -201,7 +209,7 @@ export default function StoreRequestsPage() {
 
               <section className="space-y-4">
                 <h4 className="font-bold text-neutral-800">بيانات مقدم الطلب والمنشأة</h4>
-                <dl className="grid gap-4 rounded-xl bg-neutral-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                <dl className="grid min-w-0 grid-cols-1 gap-3 rounded-xl bg-neutral-50 p-3 min-[420px]:grid-cols-2 sm:gap-4 sm:p-4 lg:grid-cols-4">
                   <Value label="اسم التاجر" value={request.fullName} />
                   <Value label="بريد حساب الدخول" value={request.email} dir="ltr" />
                   <Value label="رقم الهاتف" value={request.phone} dir="ltr" />
@@ -223,7 +231,7 @@ export default function StoreRequestsPage() {
                 {documents.length === 0 ? <p className="rounded-xl bg-neutral-50 p-4 text-sm text-neutral-500">لا توجد مستندات مرفوعة في هذا الطلب.</p> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{requiredDocumentTypes.map((type) => {
                   const document = documents.find((item) => item.documentType === type)
                   const key = `${request.id}:${type}`
-                  return <div key={type} className="flex flex-col gap-3 rounded-xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="text-sm font-semibold text-neutral-800">{documentLabels[type]}</p><p className="mt-1 text-xs text-neutral-500">{document ? `${Math.ceil(Number(document.sizeBytes || 0) / 1024)} كيلوبايت · ${document.contentType || ''}` : 'غير مرفوع'}</p></div>{document && <div className="flex shrink-0 gap-2"><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void previewDocument(request.id, type, document.contentType)} aria-label={`عرض ${documentLabels[type]}`}>{busyDocument === key ? <LoaderCircle size={16} className="animate-spin" /> : <Eye size={16} />}عرض</button><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void downloadDocument(request.id, type, document.contentType)} aria-label={`تنزيل ${documentLabels[type]}`}><Download size={16} />تنزيل</button></div>}</div>
+                  return <div key={type} className="flex min-w-0 flex-col gap-3 rounded-xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="break-words text-sm font-semibold text-neutral-800">{documentLabels[type]}</p><p className="mt-1 text-xs text-neutral-500">{document ? `${Math.ceil(Number(document.sizeBytes || 0) / 1024)} كيلوبايت · ${document.contentType || ''}` : 'غير مرفوع'}</p></div>{document && <div className="flex shrink-0 flex-wrap gap-2"><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void previewDocument(request.id, type, document.contentType)} aria-label={`عرض ${documentLabels[type]}`}>{busyDocument === key ? <LoaderCircle size={16} className="animate-spin" /> : <Eye size={16} />}عرض</button><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void downloadDocument(request.id, type, document.contentType)} aria-label={`${nativePlatform ? 'حفظ أو مشاركة' : 'تنزيل'} ${documentLabels[type]}`}><Download size={16} />{nativePlatform ? 'حفظ / مشاركة' : 'تنزيل'}</button></div>}</div>
                 })}</div>}
               </section>
 
@@ -231,9 +239,9 @@ export default function StoreRequestsPage() {
 
               {request.status === 'pending' && missing.length > 0 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">الطلب قديم أو غير مكتمل، ولا يمكن إنشاء المتجر قبل استكمال: {missing.join('، ')}. يظل الاعتماد محميًا في الخادم أيضًا.</p>}
               {request.adminNote && <p className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">ملاحظة الإدارة السابقة: {request.adminNote}</p>}
-              {request.status === 'pending' && <div className="flex flex-col gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
-                <label className="flex-1 space-y-1.5"><span className="text-xs font-semibold text-neutral-600">ملاحظة الرفض (اختيارية)</span><input className="input" maxLength={1000} value={notes[request.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="اكتب سببًا لمساعدة التاجر على تصحيح الطلب" /></label>
-                <div className="flex gap-2">
+              {request.status === 'pending' && <div className="flex min-w-0 flex-col gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
+                <label className="min-w-0 flex-1 space-y-1.5"><span className="text-xs font-semibold text-neutral-600">ملاحظة الرفض (اختيارية)</span><input className="input min-w-0 text-base sm:text-sm" maxLength={1000} value={notes[request.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="اكتب سببًا لمساعدة التاجر على تصحيح الطلب" /></label>
+                <div className="flex flex-wrap gap-2">
                   <button type="button" disabled={isBusy} onClick={() => void decide(request, 'reject')} className="btn-secondary text-rose-700 disabled:opacity-50">{isBusy ? <LoaderCircle size={16} className="animate-spin" /> : <X size={16} />}رفض الطلب</button>
                   <button type="button" disabled={isBusy || missing.length > 0} title={missing.length ? `الملف ناقص: ${missing.join('، ')}` : ''} onClick={() => void decide(request, 'approve')} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />}اعتماد وإنشاء المتجر</button>
                 </div>
@@ -244,7 +252,7 @@ export default function StoreRequestsPage() {
         </div>
       )}
 
-      {preview && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={`معاينة ${preview.label}`} onClick={() => setPreview(null)}><section className="flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}><header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3"><h2 className="font-bold text-neutral-900">{preview.label}</h2><button type="button" className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100" onClick={() => setPreview(null)} aria-label="إغلاق المعاينة"><X size={20} /></button></header><div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-neutral-100 p-2 sm:p-5">{preview.contentType?.startsWith('image/') ? <img src={preview.url} alt={preview.label} className="max-h-[75vh] max-w-full object-contain" /> : <iframe src={preview.url} title={preview.label} className="h-[75vh] w-full rounded-lg bg-white" />}</div><footer className="flex justify-end border-t border-neutral-200 p-3"><a className="btn-primary" href={preview.url} download={preview.fileName}><Download size={16} />تنزيل المستند</a></footer></section></div>}
+      {preview && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label={`معاينة ${preview.label}`} onClick={() => setPreview(null)}><section className="flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]" onClick={(event) => event.stopPropagation()}><header className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200 px-3 py-2 sm:px-4 sm:py-3"><h2 className="min-w-0 break-words text-sm font-bold text-neutral-900 sm:text-base">{preview.label}</h2><button type="button" className="shrink-0 rounded-lg p-2 text-neutral-600 hover:bg-neutral-100" onClick={() => setPreview(null)} aria-label="إغلاق المعاينة"><X size={20} /></button></header><div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-neutral-100 p-2 sm:p-5">{preview.contentType?.startsWith('image/') ? <img src={preview.url} alt={preview.label} className="max-h-[calc(100dvh-8rem)] max-w-full object-contain" /> : <iframe src={preview.url} title={preview.label} className="h-[calc(100dvh-8rem)] w-full rounded-lg bg-white" />}</div><footer className="flex shrink-0 justify-end border-t border-neutral-200 p-3"><button type="button" className="btn-primary" onClick={() => void downloadDocument(preview.requestId, preview.documentType, preview.contentType)}><Download size={16} />{nativePlatform ? 'حفظ أو مشاركة' : 'تنزيل المستند'}</button></footer></section></div>}
     </div>
   )
 }
