@@ -17,6 +17,7 @@ import ActiveProductsPage from './pages/ActiveProductsPage'
 import EmployeeProductsDashboard from './pages/EmployeeProductsDashboard'
 import CommissionsPage from './pages/CommissionsPage'
 import SettlementsPage from './pages/SettlementsPage'
+import NotificationsPage from './pages/NotificationsPage'
 import Toast from './components/ui/Toast'
 import { exitAndroidApp, registerAndroidBackButton } from './utils/androidBackButton'
 
@@ -84,6 +85,7 @@ function AppRoutes({ user, onLogout }) {
           <Route path="/active-products" element={<ActiveProductsPage />} />
           <Route path="/commissions" element={user.role === 'super_admin' ? <CommissionsPage /> : <Navigate to="/orders" replace />} />
           <Route path="/settlements" element={user.role === 'super_admin' ? <SettlementsPage /> : <Navigate to="/orders" replace />} />
+          <Route path="/notifications" element={user.role === 'super_admin' ? <NotificationsPage /> : <Navigate to="/orders" replace />} />
           <Route path="/employees" element={user.role === 'super_admin' ? <EmployeesPage /> : <Navigate to="/orders" replace />} />
           <Route path="*" element={<Navigate to={user.role === 'super_admin' ? '/' : '/product-dashboard'} replace />} />
         </Routes>

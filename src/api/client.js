@@ -123,6 +123,9 @@ export const adminApi = {
   googleLogin: (idToken) => request('/auth/google', { method: 'POST', body: { idToken }, auth: false }),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  notificationStatus: () => request('/notifications/status'),
+  notificationContacts: (audience = '', page = 1, limit = 50) => request(`/notifications/contacts${pageQuery(page, limit, audience ? { audience } : {})}`),
+  sendNotification: (campaign) => request('/notifications/send', { method: 'POST', body: campaign }),
   employees: () => request('/employees'),
   storeRequests: (status = 'pending', page = 1, limit = 100) => request(`/store-requests${pageQuery(page, limit, { status })}`),
   storeRequestDocument: async (id, documentType) => {

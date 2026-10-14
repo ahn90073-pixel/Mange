@@ -25,6 +25,7 @@ const pageMeta = {
     subtitle: 'سندات القبض والصرف للتجار',
   },
   '/employees': { title: 'إدارة الموظفين', subtitle: 'حسابات الموظفين وصلاحيات المحافظات' },
+  '/notifications': { title: 'مركز الإشعارات', subtitle: 'حملات Firebase للعملاء والتجار المفعّلين' },
 }
 
 export default function Layout({ children, user, onLogout }) {
