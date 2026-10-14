@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, Clock3, Download, Eye, FileCheck2, LoaderCircle, RefreshCw, Share2, Store, X } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
+import { Directory, Filesystem } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 import { adminApi } from '../api/client'
 
 const statusLabels = { pending: 'قيد المراجعة', approved: 'تمت الموافقة', rejected: 'مرفوض' }
@@ -11,6 +13,35 @@ const documentLabels = {
 }
 const payoutLabels = { vodafone_cash: 'فودافون كاش', instapay: 'InstaPay', bank: 'حساب بنكي' }
 const requiredDocumentTypes = Object.keys(documentLabels)
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '')
+    reader.onerror = () => reject(reader.error || new Error('تعذر قراءة الملف.'))
+    reader.readAsDataURL(blob)
+  })
+}
+async function shareNativeFiles(files, title, text = '') {
+  const saved = []
+  try {
+    const uris = []
+    for (const [index, file] of files.entries()) {
+      const safeName = file.name.replace(/[^\p{L}\p{N}._-]/gu, '_')
+      const path = `merchant-documents/${Date.now()}-${index}-${safeName}`
+      const result = await Filesystem.writeFile({
+        path,
+        data: await blobToBase64(file),
+        directory: Directory.Cache,
+        recursive: true,
+      })
+      saved.push(path)
+      uris.push(result.uri)
+    }
+    return await Share.share({ title, text, files: uris, dialogTitle: title })
+  } finally {
+    await Promise.all(saved.map((path) => Filesystem.deleteFile({ path, directory: Directory.Cache }).catch(() => {})))
+  }
+}
 
 function missingProfileSections(request) {
   const profile = request.profileData || {}
@@ -43,6 +74,7 @@ export default function StoreRequestsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const nativePlatform = Capacitor.isNativePlatform()
+  const nativeFileShareAvailable = nativePlatform && Capacitor.isPluginAvailable('Filesystem') && Capacitor.isPluginAvailable('Share')
 
   const loadRequests = useCallback(async () => {
     setLoading(true)
@@ -92,7 +124,11 @@ export default function StoreRequestsPage() {
       const extension = contentType === 'application/pdf' ? 'pdf' : contentType === 'image/png' ? 'png' : 'jpg'
       const fileName = `${documentType}.${extension}`
       const file = new File([blob], fileName, { type: contentType || blob.type })
-      if (nativePlatform && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+      if (nativeFileShareAvailable) {
+        await shareNativeFiles([file], fileName)
+      } else if (nativePlatform && typeof navigator.share !== 'function') {
+        throw new Error('يلزم تثبيت إصدار التطبيق الجديد لتفعيل حفظ ومشاركة المستندات على الهاتف.')
+      } else if (nativePlatform && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
         await navigator.share({ title: fileName, files: [file] })
       } else {
         const url = URL.createObjectURL(blob)
@@ -130,8 +166,8 @@ export default function StoreRequestsPage() {
   const shareRequestDocuments = async (request) => {
     const documents = request.documents || []
     if (!documents.length) return
-    if (typeof navigator.share !== 'function') {
-      setError('مشاركة الملفات غير مدعومة في هذا المتصفح. نزّل الملفات ثم أرفقها يدويًا في WhatsApp.')
+    if (!nativeFileShareAvailable && typeof navigator.share !== 'function') {
+      setError(nativePlatform ? 'يلزم تثبيت إصدار التطبيق الجديد لتفعيل مشاركة الملفات.' : 'مشاركة الملفات غير مدعومة في هذا المتصفح. نزّل الملفات ثم أرفقها يدويًا في WhatsApp.')
       return
     }
     setSharingId(request.id)
@@ -154,20 +190,15 @@ export default function StoreRequestsPage() {
   }
 
   const confirmShare = async () => {
-    if (!pendingShare || typeof navigator.share !== 'function') return
-    // Launch the native share sheet directly from this click. Fetching finishes
-    // in the preparation step so mobile browsers still have user activation.
-    let sharePromise
+    if (!pendingShare || (!nativeFileShareAvailable && typeof navigator.share !== 'function')) return
     try {
-      sharePromise = navigator.share({ title: pendingShare.title, text: 'مستندات طلب تسجيل المنشأة', files: pendingShare.files })
-    } catch (shareError) {
-      setError(shareError.message || 'تعذرت مشاركة الملفات من هذا الجهاز.')
-      return
-    }
-    setSharingId(pendingShare.requestId)
-    setError('')
-    try {
-      await sharePromise
+      setSharingId(pendingShare.requestId)
+      setError('')
+      if (nativeFileShareAvailable) {
+        await shareNativeFiles(pendingShare.files, pendingShare.title, 'مستندات طلب تسجيل المنشأة')
+      } else {
+        await navigator.share({ title: pendingShare.title, text: 'مستندات طلب تسجيل المنشأة', files: pendingShare.files })
+      }
       setPendingShare(null)
     } catch (shareError) {
       if (shareError?.name !== 'AbortError') setError(shareError.message || 'تعذرت مشاركة الملفات من هذا الجهاز.')
@@ -231,7 +262,7 @@ export default function StoreRequestsPage() {
                 {documents.length === 0 ? <p className="rounded-xl bg-neutral-50 p-4 text-sm text-neutral-500">لا توجد مستندات مرفوعة في هذا الطلب.</p> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{requiredDocumentTypes.map((type) => {
                   const document = documents.find((item) => item.documentType === type)
                   const key = `${request.id}:${type}`
-                  return <div key={type} className="flex min-w-0 flex-col gap-3 rounded-xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="break-words text-sm font-semibold text-neutral-800">{documentLabels[type]}</p><p className="mt-1 text-xs text-neutral-500">{document ? `${Math.ceil(Number(document.sizeBytes || 0) / 1024)} كيلوبايت · ${document.contentType || ''}` : 'غير مرفوع'}</p></div>{document && <div className="flex shrink-0 flex-wrap gap-2"><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void previewDocument(request.id, type, document.contentType)} aria-label={`عرض ${documentLabels[type]}`}>{busyDocument === key ? <LoaderCircle size={16} className="animate-spin" /> : <Eye size={16} />}عرض</button><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void downloadDocument(request.id, type, document.contentType)} aria-label={`${nativePlatform ? 'حفظ أو مشاركة' : 'تنزيل'} ${documentLabels[type]}`}><Download size={16} />{nativePlatform ? 'حفظ / مشاركة' : 'تنزيل'}</button></div>}</div>
+                  return <div key={type} className="flex min-w-0 flex-col gap-3 rounded-xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="break-words text-sm font-semibold text-neutral-800">{documentLabels[type]}</p><p className="mt-1 text-xs text-neutral-500">{document ? `${Math.ceil(Number(document.sizeBytes || 0) / 1024)} كيلوبايت · ${document.contentType || ''}` : 'غير مرفوع'}</p></div>{document && <div className="flex shrink-0 flex-wrap gap-2"><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void previewDocument(request.id, type, document.contentType)} aria-label={`عرض ${documentLabels[type]}`}>{busyDocument === key ? <LoaderCircle size={16} className="animate-spin" /> : <Eye size={16} />}عرض</button><button type="button" className="btn-secondary px-3" disabled={busyDocument === key} onClick={() => void downloadDocument(request.id, type, document.contentType)} aria-label={`${nativePlatform ? 'حفظ أو مشاركة' : 'تنزيل'} ${documentLabels[type]}`}><Download size={16} />{nativePlatform ? nativeFileShareAvailable ? 'حفظ / مشاركة' : 'تحديث مطلوب' : 'تنزيل'}</button></div>}</div>
                 })}</div>}
               </section>
 
@@ -252,7 +283,7 @@ export default function StoreRequestsPage() {
         </div>
       )}
 
-      {preview && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label={`معاينة ${preview.label}`} onClick={() => setPreview(null)}><section className="flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]" onClick={(event) => event.stopPropagation()}><header className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200 px-3 py-2 sm:px-4 sm:py-3"><h2 className="min-w-0 break-words text-sm font-bold text-neutral-900 sm:text-base">{preview.label}</h2><button type="button" className="shrink-0 rounded-lg p-2 text-neutral-600 hover:bg-neutral-100" onClick={() => setPreview(null)} aria-label="إغلاق المعاينة"><X size={20} /></button></header><div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-neutral-100 p-2 sm:p-5">{preview.contentType?.startsWith('image/') ? <img src={preview.url} alt={preview.label} className="max-h-[calc(100dvh-8rem)] max-w-full object-contain" /> : <iframe src={preview.url} title={preview.label} className="h-[calc(100dvh-8rem)] w-full rounded-lg bg-white" />}</div><footer className="flex shrink-0 justify-end border-t border-neutral-200 p-3"><button type="button" className="btn-primary" onClick={() => void downloadDocument(preview.requestId, preview.documentType, preview.contentType)}><Download size={16} />{nativePlatform ? 'حفظ أو مشاركة' : 'تنزيل المستند'}</button></footer></section></div>}
+      {preview && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label={`معاينة ${preview.label}`} onClick={() => setPreview(null)}><section className="flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]" onClick={(event) => event.stopPropagation()}><header className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200 px-3 py-2 sm:px-4 sm:py-3"><h2 className="min-w-0 break-words text-sm font-bold text-neutral-900 sm:text-base">{preview.label}</h2><button type="button" className="shrink-0 rounded-lg p-2 text-neutral-600 hover:bg-neutral-100" onClick={() => setPreview(null)} aria-label="إغلاق المعاينة"><X size={20} /></button></header><div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-neutral-100 p-2 sm:p-5">{preview.contentType?.startsWith('image/') ? <img src={preview.url} alt={preview.label} className="max-h-[calc(100dvh-8rem)] max-w-full object-contain" /> : <iframe src={preview.url} title={preview.label} className="h-[calc(100dvh-8rem)] w-full rounded-lg bg-white" />}</div><footer className="flex shrink-0 justify-end border-t border-neutral-200 p-3"><button type="button" className="btn-primary" onClick={() => void downloadDocument(preview.requestId, preview.documentType, preview.contentType)}><Download size={16} />{nativePlatform ? nativeFileShareAvailable ? 'حفظ أو مشاركة' : 'تحديث التطبيق مطلوب' : 'تنزيل المستند'}</button></footer></section></div>}
     </div>
   )
 }
