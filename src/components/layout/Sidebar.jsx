@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   Users,
   ClipboardCheck,
+  BellRing,
   Package,
   X,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ const navItems = [
   { to: '/commissions', label: 'إدارة العمولات', icon: Percent, superAdminOnly: true },
   { to: '/settlements', label: 'السدادات المالية', icon: Receipt, superAdminOnly: true },
   { to: '/employees', label: 'إدارة الموظفين', icon: Users, superAdminOnly: true },
+  { to: '/notifications', label: 'مركز الإشعارات', icon: BellRing, superAdminOnly: true },
 ]
 
 export default function Sidebar({ open, onClose, user }) {

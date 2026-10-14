@@ -26,6 +26,14 @@ const statusTransitions = {
   refunded: ['refunded'],
 }
 
+function internationalPhone(value) {
+  const arabicDigits = String(value || '').replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+  let digits = arabicDigits.replace(/\D/g, '')
+  if (digits.startsWith('00')) digits = digits.slice(2)
+  if (digits.startsWith('0')) digits = `20${digits.slice(1)}`
+  return digits
+}
+
 function Field({ label, children }) {
   return <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">{label}</span>{children}</label>
 }
@@ -38,6 +46,8 @@ function OrderDetails({ order, onClose, onUpdated }) {
   const [shipmentStatus, setShipmentStatus] = useState(order.shipment.status || 'pending')
   const [shippingFee, setShippingFee] = useState(String(order.totals.shipping || 0))
   const [saving, setSaving] = useState(false)
+  const whatsappPhone = internationalPhone(order.customer.phone)
+  const whatsappUrl = whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(`طلب رقم ${order.order_number || order.id}\nتم تجهيز طردك`)}` : ''
 
   const changeOrderStatus = (nextStatus) => {
     setStatus(nextStatus)
@@ -119,6 +129,7 @@ function OrderDetails({ order, onClose, onUpdated }) {
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between gap-3"><dt className="text-neutral-500">الاسم</dt><dd className="text-left font-semibold text-neutral-800">{order.customer.name}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-neutral-500">الهاتف</dt><dd dir="ltr" className="text-left font-semibold text-neutral-800">{order.customer.phone || '—'}</dd></div>
+                {whatsappUrl && <div className="border-t border-neutral-100 pt-3"><a href={whatsappUrl} target="_blank" rel="noreferrer" className="btn-success w-full">فتح WhatsApp برسالة جاهزة</a><p className="mt-2 text-xs leading-5 text-neutral-500">يفتح الرابط محادثة برسالة جاهزة ولا يرسلها تلقائيًا.</p></div>}
                 <div className="flex justify-between gap-3"><dt className="text-neutral-500">البريد</dt><dd className="break-all text-left text-neutral-800">{order.customer.email || '—'}</dd></div>
                 <div className="border-t border-neutral-100 pt-2 text-neutral-700">{[order.address.country, order.address.governorate, order.address.city, order.address.district, order.address.street, order.address.building, order.address.apartment, order.address.postalCode].filter(Boolean).join('، ') || 'لا يوجد عنوان محفوظ'}</div>
                 {order.address.notes && <p className="text-xs text-neutral-500">ملاحظة العنوان: {order.address.notes}</p>}
@@ -159,7 +170,7 @@ function OrderDetails({ order, onClose, onUpdated }) {
               <Field label="حالة الطلب"><select className="input" value={status} onChange={(event) => changeOrderStatus(event.target.value)}>{statusOptions.filter(([value]) => (statusTransitions[order.status] || [order.status]).includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label="شركة الشحن"><input className="input" value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="تُسجل يدويًا" maxLength={120} /></Field>
               <Field label="رقم التتبع"><input className="input" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="إن توفر" maxLength={160} /></Field>
-              <Field label="حالة الشحنة"><select className="input" value={shipmentStatus} onChange={(event) => setShipmentStatus(event.target.value)}>{[['pending','بانتظار التجهيز'],['label_created','تم إنشاء بوليصة'],['picked_up','استلمتها شركة الشحن'],['in_transit','في الطريق'],['delivered','تم التسليم'],['failed','تعذر التسليم'],['returned','مرتجع']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+              <Field label="حالة الشحنة"><select className="input" value={shipmentStatus} onChange={(event) => setShipmentStatus(event.target.value)}>{[['pending','بانتظار التجهيز'],['label_created','تم إنشاء بوليصة'],['ready','تم تجهيز الطرد'],['picked_up','استلمتها شركة الشحن'],['in_transit','في الطريق'],['delivered','تم التسليم'],['failed','تعذر التسليم'],['returned','مرتجع']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label={`رسوم الشحن (${order.totals.currency})`}><input className="input" type="number" min="0" step="0.01" value={shippingFee} onChange={(event) => setShippingFee(event.target.value)} /></Field>
             </div>
             <p className="mt-3 text-xs leading-5 text-neutral-500">لا يوجد اتصال آلي بشركة شحن في الوقت الحالي؛ تُدخل بياناتها ورقم التتبع بعد التواصل معها خارج النظام.</p>
