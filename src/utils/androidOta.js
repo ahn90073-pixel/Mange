@@ -6,7 +6,7 @@ const OTA_RELEASE_API =
 const OTA_ASSET_NAME = 'dist.zip'
 const SUCCESSFUL_CHECK_KEY = 'mange.android-ota.last-success'
 const LAST_ATTEMPT_KEY = 'mange.android-ota.last-attempt'
-const CHECK_INTERVAL_MS = 60 * 60 * 1000
+const CHECK_INTERVAL_MS = 5 * 60 * 1000
 const RETRY_INTERVAL_MS = 2 * 60 * 1000
 
 let checkInFlight
@@ -128,10 +128,15 @@ async function checkForAndroidUpdate({ force = false } = {}) {
       await CapacitorUpdater.next({ id: downloaded.id })
       setStoredTime(SUCCESSFUL_CHECK_KEY, Date.now())
       const size = `${(asset.size / (1024 * 1024)).toFixed(2)} MB`
+      try {
+        await CapacitorUpdater.reload()
+      } catch (reloadError) {
+        console.warn('[OTA] Bundle downloaded but immediate reload failed.', reloadError)
+      }
       return diagnostic(
         'downloaded',
-        'تم تنزيل تحديث الواجهة وجدولته بنجاح.',
-        `رقم الحزمة: ${version}؛ حجمها: ${size}. أغلق التطبيق وافتحه مجددًا لتطبيقها.`,
+        'تم تنزيل تحديث الواجهة وتطبيقه تلقائيًا.',
+        `رقم الحزمة: ${version}؛ حجمها: ${size}.`,
       )
     } catch (error) {
       const details = error instanceof Error ? error.message : String(error)
