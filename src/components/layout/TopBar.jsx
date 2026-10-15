@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { Menu, Bell, Search, RefreshCw, Smartphone, X, LogOut } from 'lucide-react'
+import { Menu, Search, RefreshCw, Smartphone, Store, UsersRound, X, LogOut } from 'lucide-react'
 import { checkAndroidOtaNow } from '../../utils/androidOta'
 import { adminApi } from '../../api/client'
+import { useNavigate } from 'react-router-dom'
 
 export default function TopBar({ onMenuClick, title, subtitle, user, onLogout }) {
   const [otaResult, setOtaResult] = useState(null)
   const [checkingOta, setCheckingOta] = useState(false)
   const [deviceStats, setDeviceStats] = useState(null)
+  const navigate = useNavigate()
   const isAndroid = Capacitor.getPlatform() === 'android'
   const isDashboardTitle = title === 'لوحة التحكم'
 
@@ -155,14 +157,32 @@ export default function TopBar({ onMenuClick, title, subtitle, user, onLogout })
             </div>
           )}
 
-          <button
-            type="button"
-            aria-label="الإشعارات"
-            className="relative rounded-xl p-2.5 text-white/85 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <Bell size={20} />
-            <span className="absolute left-2 top-2 h-2 w-2 rounded-full bg-rose-400 ring-2 ring-[#15375c]" />
-          </button>
+          {user?.role === 'super_admin' && (
+            <div className="flex items-center gap-1.5" aria-label="إرسال إشعارات سريعة">
+              <button
+                type="button"
+                onClick={() => navigate('/notifications?audience=customer')}
+                title="إشعار العملاء"
+                aria-label="إرسال إشعار للعملاء"
+                className="relative flex items-center gap-1 rounded-xl border border-sky-200/30 bg-sky-400/10 p-2 text-sky-100 transition-colors hover:bg-sky-400/25 sm:px-2.5"
+              >
+                <UsersRound size={19} />
+                <span className="hidden text-[11px] font-semibold lg:inline">العملاء</span>
+                {deviceStats?.customer?.readyToSend > 0 && <span className="min-w-4 rounded-full bg-sky-200 px-1 text-center text-[10px] font-bold text-[#102b4a]">{deviceStats.customer.readyToSend}</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/notifications?audience=merchant')}
+                title="إشعار التجار"
+                aria-label="إرسال إشعار للتجار"
+                className="relative flex items-center gap-1 rounded-xl border border-amber-200/30 bg-amber-300/10 p-2 text-amber-100 transition-colors hover:bg-amber-300/25 sm:px-2.5"
+              >
+                <Store size={19} />
+                <span className="hidden text-[11px] font-semibold lg:inline">التجار</span>
+                {deviceStats?.merchant?.readyToSend > 0 && <span className="min-w-4 rounded-full bg-amber-200 px-1 text-center text-[10px] font-bold text-[#102b4a]">{deviceStats.merchant.readyToSend}</span>}
+              </button>
+            </div>
+          )}
 
           <div className="hidden items-center gap-2.5 border-r border-white/20 pr-3 sm:flex">
             <div className="text-left">

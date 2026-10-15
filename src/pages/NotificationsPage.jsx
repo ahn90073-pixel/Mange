@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BellRing, Image, LoaderCircle, RefreshCw, Send, Users, X } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { adminApi } from '../api/client'
 import { useDashboard } from '../context/DashboardContext'
 
@@ -7,6 +8,7 @@ const audienceLabels = { customer: 'العملاء', merchant: 'التجار' }
 
 export default function NotificationsPage() {
   const { vendors, showToast } = useDashboard()
+  const [searchParams] = useSearchParams()
   const [audience, setAudience] = useState('customer')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -42,6 +44,11 @@ export default function NotificationsPage() {
   const configured = Boolean(status?.configured?.[audience])
   const requiredSecret = audience === 'customer' ? 'FCM_PUBLIC_SERVICE_ACCOUNT_JSON' : 'FCM_SERVICE_ACCOUNT_JSON'
   const selectedStore = useMemo(() => vendors.find((vendor) => vendor.id === companyId), [companyId, vendors])
+
+  useEffect(() => {
+    const requestedAudience = searchParams.get('audience')
+    if (audienceLabels[requestedAudience]) setAudience(requestedAudience)
+  }, [searchParams])
 
   const submit = async (event) => {
     event.preventDefault()
