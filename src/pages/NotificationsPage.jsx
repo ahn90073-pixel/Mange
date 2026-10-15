@@ -47,7 +47,10 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const requestedAudience = searchParams.get('audience')
-    if (audienceLabels[requestedAudience]) setAudience(requestedAudience)
+    if (audienceLabels[requestedAudience]) {
+      setAudience(requestedAudience)
+      if (requestedAudience === 'customer') setCompanyId('')
+    }
   }, [searchParams])
 
   const submit = async (event) => {
@@ -118,7 +121,7 @@ export default function NotificationsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <section className="card p-4"><p className="text-xs text-neutral-500">جهات {audienceLabels[audience]}</p><p className="mt-2 text-2xl font-bold text-neutral-900">{audienceStats.total}</p><p className="mt-1 text-xs text-neutral-500">المفعّل منهم: {audienceStats.optedIn}</p></section>
         <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p><p className="mt-1 text-xs text-neutral-500">الحد الأقصى للحملة: 500 رمز</p></section>
-        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{selectedStore?.companyName || 'كل المتاجر'}</p><p className="mt-1 text-xs text-neutral-500">{companyId ? 'متجر محدد' : 'الجمهور الكامل'}</p></section>
+        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? 'كل العملاء' : (selectedStore?.companyName || 'كل التجار')}</p><p className="mt-1 text-xs text-neutral-500">{audience === 'customer' ? 'أجهزة العملاء المسجلة' : (companyId ? 'تاجر محدد' : 'كل التجار')}</p></section>
       </div>
 
       <section className="card p-5 sm:p-6">
@@ -126,10 +129,10 @@ export default function NotificationsPage() {
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div role="group" aria-label="اختيار جمهور الإشعارات" className="grid grid-cols-2 gap-2 sm:col-span-2">
-              <button type="button" aria-pressed={audience === 'customer'} onClick={() => setAudience('customer')} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'customer' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات الجمهور</button>
+              <button type="button" aria-pressed={audience === 'customer'} onClick={() => { setAudience('customer'); setCompanyId('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'customer' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات الجمهور</button>
               <button type="button" aria-pressed={audience === 'merchant'} onClick={() => setAudience('merchant')} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'merchant' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات التجار</button>
             </div>
-            <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">المتجر (اختياري)</span><select className="input" value={companyId} onChange={(event) => setCompanyId(event.target.value)}><option value="">كل المتاجر</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName || vendor.name || vendor.id}</option>)}</select></label>
+            {audience === 'merchant' && <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">التاجر (اختياري)</span><select className="input" value={companyId} onChange={(event) => setCompanyId(event.target.value)}><option value="">كل التجار</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName || vendor.name || vendor.id}</option>)}</select></label>}
           </div>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">العنوان <span className="font-normal text-neutral-400">(120 حرفًا)</span></span><input required maxLength={120} className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="عنوان الإشعار" /></label>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">النص <span className="font-normal text-neutral-400">(500 حرف)</span></span><textarea required maxLength={500} rows={4} className="input resize-y" value={body} onChange={(event) => setBody(event.target.value)} placeholder="نص الرسالة التي ستظهر للمستلم" /></label>
@@ -149,8 +152,8 @@ export default function NotificationsPage() {
       </section>
 
       <section className="card overflow-hidden">
-        <div className="border-b border-neutral-100 px-5 py-4"><h3 className="font-bold text-neutral-900">جهات مختصرة</h3><p className="mt-1 text-xs text-neutral-500">لا تعرض هذه القائمة رموز FCM أو أي أسرار.</p></div>
-        {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ التحميل...</div> : contacts.length === 0 ? <p className="p-8 text-center text-sm text-neutral-500">لا توجد جهات مطابقة.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right text-sm"><thead className="bg-neutral-50 text-xs text-neutral-500"><tr><th className="px-4 py-3">{audience === 'merchant' ? 'اسم التاجر' : 'الاسم'}</th><th className="px-4 py-3">المتجر</th><th className="px-4 py-3">WhatsApp</th><th className="px-4 py-3">Push</th></tr></thead><tbody className="divide-y divide-neutral-100">{contacts.map((contact, index) => <tr key={`${contact.companyId}-${contact.whatsappPhone}-${index}`} className="table-row-hover"><td className="px-4 py-3">{contact.name}</td><td className="px-4 py-3">{contact.storeName}</td><td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td><td className="px-4 py-3">{contact.pushEnabled && contact.hasPushToken ? <span className="badge-success">مفعّل</span> : <span className="badge-neutral">غير جاهز</span>}</td></tr>)}</tbody></table></div>}
+        <div className="border-b border-neutral-100 px-5 py-4"><h3 className="font-bold text-neutral-900">{audience === 'merchant' ? 'أجهزة التجار' : 'أجهزة العملاء'}</h3><p className="mt-1 text-xs text-neutral-500">لا تعرض هذه القائمة رموز FCM أو أي أسرار.</p></div>
+        {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ التحميل...</div> : contacts.length === 0 ? <p className="p-8 text-center text-sm text-neutral-500">لا توجد أجهزة مطابقة.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right text-sm"><thead className="bg-neutral-50 text-xs text-neutral-500"><tr><th className="px-4 py-3">{audience === 'merchant' ? 'اسم التاجر' : 'العميل / الجهاز'}</th>{audience === 'merchant' && <th className="px-4 py-3">المتجر</th>}<th className="px-4 py-3">WhatsApp</th><th className="px-4 py-3">Push</th></tr></thead><tbody className="divide-y divide-neutral-100">{contacts.map((contact, index) => <tr key={`${contact.companyId}-${contact.whatsappPhone}-${index}`} className="table-row-hover"><td className="px-4 py-3">{contact.name}</td>{audience === 'merchant' && <td className="px-4 py-3">{contact.storeName}</td>}<td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td><td className="px-4 py-3">{contact.pushEnabled && contact.hasPushToken ? <span className="badge-success">مفعّل</span> : <span className="badge-neutral">غير جاهز</span>}</td></tr>)}</tbody></table></div>}
       </section>
     </div>
   )
