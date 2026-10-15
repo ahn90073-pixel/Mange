@@ -1,33 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { Menu, Search, RefreshCw, Smartphone, Store, UsersRound, X, LogOut } from 'lucide-react'
+import { Menu, Search, RefreshCw, Store, UsersRound, X, LogOut } from 'lucide-react'
 import { checkAndroidOtaNow } from '../../utils/androidOta'
-import { adminApi } from '../../api/client'
 import { useNavigate } from 'react-router-dom'
 
 export default function TopBar({ onMenuClick, title, subtitle, user, onLogout }) {
   const [otaResult, setOtaResult] = useState(null)
   const [checkingOta, setCheckingOta] = useState(false)
-  const [deviceStats, setDeviceStats] = useState(null)
   const navigate = useNavigate()
   const isAndroid = Capacitor.getPlatform() === 'android'
   const isDashboardTitle = title === 'لوحة التحكم'
-
-  useEffect(() => {
-    if (user?.role !== 'super_admin') return undefined
-    let active = true
-    const loadDeviceStats = async () => {
-      try {
-        const result = await adminApi.notificationStatus()
-        if (active) setDeviceStats(result?.audiences || null)
-      } catch {
-        // The header remains usable when the notification endpoint is unavailable.
-      }
-    }
-    void loadDeviceStats()
-    const timer = window.setInterval(loadDeviceStats, 60_000)
-    return () => { active = false; window.clearInterval(timer) }
-  }, [user?.role])
 
   const handleOtaCheck = async () => {
     setCheckingOta(true)
@@ -146,17 +128,6 @@ export default function TopBar({ onMenuClick, title, subtitle, user, onLogout })
             </div>
           )}
 
-          {user?.role === 'super_admin' && deviceStats && (
-            <div className="hidden items-center gap-1.5 lg:flex" aria-label="أجهزة الإشعارات">
-              <div title="أجهزة العملاء الجاهزة للإشعار" className="flex items-center gap-1 rounded-lg border border-sky-200/30 bg-sky-400/15 px-2 py-1.5 text-[11px] font-semibold text-sky-100">
-                <Smartphone size={14} />عملاء <b>{deviceStats.customer?.readyToSend ?? 0}</b>
-              </div>
-              <div title="أجهزة التجار الجاهزة للإشعار" className="flex items-center gap-1 rounded-lg border border-amber-200/30 bg-amber-300/15 px-2 py-1.5 text-[11px] font-semibold text-amber-100">
-                <Smartphone size={14} />تجار <b>{deviceStats.merchant?.readyToSend ?? 0}</b>
-              </div>
-            </div>
-          )}
-
           {user?.role === 'super_admin' && (
             <div className="flex items-center gap-1.5" aria-label="إرسال إشعارات سريعة">
               <button
@@ -168,7 +139,6 @@ export default function TopBar({ onMenuClick, title, subtitle, user, onLogout })
               >
                 <UsersRound size={19} />
                 <span className="hidden text-[11px] font-semibold lg:inline">العملاء</span>
-                {deviceStats?.customer?.readyToSend > 0 && <span className="min-w-4 rounded-full bg-sky-200 px-1 text-center text-[10px] font-bold text-[#102b4a]">{deviceStats.customer.readyToSend}</span>}
               </button>
               <button
                 type="button"
@@ -179,7 +149,6 @@ export default function TopBar({ onMenuClick, title, subtitle, user, onLogout })
               >
                 <Store size={19} />
                 <span className="hidden text-[11px] font-semibold lg:inline">التجار</span>
-                {deviceStats?.merchant?.readyToSend > 0 && <span className="min-w-4 rounded-full bg-amber-200 px-1 text-center text-[10px] font-bold text-[#102b4a]">{deviceStats.merchant.readyToSend}</span>}
               </button>
             </div>
           )}

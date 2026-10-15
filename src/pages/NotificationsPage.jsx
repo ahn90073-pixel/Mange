@@ -6,6 +6,15 @@ import { useDashboard } from '../context/DashboardContext'
 
 const audienceLabels = { customer: 'العملاء', merchant: 'التجار' }
 
+function formatLastSeen(value) {
+  if (!value) return '—'
+  try {
+    return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+  } catch {
+    return '—'
+  }
+}
+
 export default function NotificationsPage() {
   const { vendors, showToast } = useDashboard()
   const [searchParams] = useSearchParams()
@@ -152,8 +161,8 @@ export default function NotificationsPage() {
       </section>
 
       <section className="card overflow-hidden">
-        <div className="border-b border-neutral-100 px-5 py-4"><h3 className="font-bold text-neutral-900">{audience === 'merchant' ? 'أجهزة التجار' : 'أجهزة العملاء'}</h3><p className="mt-1 text-xs text-neutral-500">لا تعرض هذه القائمة رموز FCM أو أي أسرار.</p></div>
-        {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ التحميل...</div> : contacts.length === 0 ? <p className="p-8 text-center text-sm text-neutral-500">لا توجد أجهزة مطابقة.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right text-sm"><thead className="bg-neutral-50 text-xs text-neutral-500"><tr><th className="px-4 py-3">{audience === 'merchant' ? 'اسم التاجر' : 'العميل / الجهاز'}</th>{audience === 'merchant' && <th className="px-4 py-3">المتجر</th>}<th className="px-4 py-3">WhatsApp</th><th className="px-4 py-3">Push</th></tr></thead><tbody className="divide-y divide-neutral-100">{contacts.map((contact, index) => <tr key={`${contact.companyId}-${contact.whatsappPhone}-${index}`} className="table-row-hover"><td className="px-4 py-3">{contact.name}</td>{audience === 'merchant' && <td className="px-4 py-3">{contact.storeName}</td>}<td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td><td className="px-4 py-3">{contact.pushEnabled && contact.hasPushToken ? <span className="badge-success">مفعّل</span> : <span className="badge-neutral">غير جاهز</span>}</td></tr>)}</tbody></table></div>}
+        <div className="border-b border-neutral-100 px-5 py-4"><h3 className="font-bold text-neutral-900">{audience === 'merchant' ? 'جدول توكنات التجار' : 'جدول توكنات الجمهور'}</h3><p className="mt-1 text-xs text-neutral-500">{audience === 'merchant' ? 'اسم التاجر واسم الشركة يحددان الجهاز.' : 'يظهر رقم الهاتف وبيانات الجهاز للمساعدة في التعرف على العميل.'} لا تعرض القائمة التوكن كاملًا.</p></div>
+        {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ التحميل...</div> : contacts.length === 0 ? <p className="p-8 text-center text-sm text-neutral-500">لا توجد أجهزة مطابقة.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-right text-sm"><thead className="bg-neutral-50 text-xs text-neutral-500"><tr><th className="px-4 py-3">{audience === 'merchant' ? 'اسم التاجر' : 'بيانات العميل'}</th>{audience === 'merchant' && <th className="px-4 py-3">الشركة</th>}<th className="px-4 py-3">الهاتف</th><th className="px-4 py-3">المنصة / الإصدار</th><th className="px-4 py-3">آخر نشاط</th><th className="px-4 py-3">التوكن المختصر</th><th className="px-4 py-3">Push</th></tr></thead><tbody className="divide-y divide-neutral-100">{contacts.map((contact, index) => <tr key={`${contact.companyId}-${contact.whatsappPhone}-${index}`} className="table-row-hover"><td className="px-4 py-3"><p className="font-semibold">{contact.name}</p>{audience === 'customer' && <p className="mt-1 text-xs text-neutral-500">جهاز مسجل</p>}</td>{audience === 'merchant' && <td className="px-4 py-3">{contact.storeName}</td>}<td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td><td className="px-4 py-3">{contact.platform} / {contact.appVersion}</td><td className="px-4 py-3 text-xs text-neutral-600">{formatLastSeen(contact.lastSeenAt)}</td><td dir="ltr" className="px-4 py-3 text-left font-mono text-xs text-neutral-500">{contact.tokenHint}</td><td className="px-4 py-3">{contact.pushEnabled && contact.hasPushToken ? <span className="badge-success">مفعّل</span> : <span className="badge-neutral">غير جاهز</span>}</td></tr>)}</tbody></table></div>}
       </section>
     </div>
   )
