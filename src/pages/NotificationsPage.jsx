@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BellRing, LoaderCircle, RefreshCw, Send, Users } from 'lucide-react'
+import { BellRing, Image, LoaderCircle, RefreshCw, Send, Users, X } from 'lucide-react'
 import { adminApi } from '../api/client'
 import { useDashboard } from '../context/DashboardContext'
 
@@ -10,6 +10,9 @@ export default function NotificationsPage() {
   const [audience, setAudience] = useState('customer')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [imageData, setImageData] = useState('')
+  const [imageName, setImageName] = useState('')
+  const [imagePreview, setImagePreview] = useState('')
   const [companyId, setCompanyId] = useState('')
   const [status, setStatus] = useState(null)
   const [contacts, setContacts] = useState([])
@@ -49,6 +52,7 @@ export default function NotificationsPage() {
         audience,
         title: title.trim(),
         body: body.trim(),
+        ...(imageData ? { imageData, imageName } : {}),
         ...(companyId ? { companyId } : {}),
       })
       setResult(response)
@@ -58,6 +62,34 @@ export default function NotificationsPage() {
     } finally {
       setSending(false)
     }
+  }
+
+  const handleImage = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      showToast('error', 'اختر صورة PNG أو JPG أو WEBP فقط.')
+      event.target.value = ''
+      return
+    }
+    if (file.size > 1_500_000) {
+      showToast('error', 'حجم صورة الإشعار يجب ألا يتجاوز 1.5 ميجابايت.')
+      event.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      setImageData(String(reader.result || ''))
+      setImageName(file.name)
+      setImagePreview(String(reader.result || ''))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const clearImage = () => {
+    setImageData('')
+    setImageName('')
+    setImagePreview('')
   }
 
   return (
@@ -94,6 +126,13 @@ export default function NotificationsPage() {
           </div>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">العنوان <span className="font-normal text-neutral-400">(120 حرفًا)</span></span><input required maxLength={120} className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="عنوان الإشعار" /></label>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">النص <span className="font-normal text-neutral-400">(500 حرف)</span></span><textarea required maxLength={500} rows={4} className="input resize-y" value={body} onChange={(event) => setBody(event.target.value)} placeholder="نص الرسالة التي ستظهر للمستلم" /></label>
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><p className="flex items-center gap-2 text-sm font-bold text-neutral-800"><Image size={17} className="text-primary-600" />صورة الإشعار <span className="text-xs font-normal text-neutral-500">اختياري — حتى 1.5 ميجابايت</span></p><p className="mt-1 text-xs text-neutral-500">ستظهر الصورة في إشعار Firebase على الأجهزة التي تدعمها.</p></div>
+              <label className="btn-secondary cursor-pointer"><Image size={16} />رفع صورة<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={handleImage} /></label>
+            </div>
+            {imagePreview && <div className="relative mt-3 w-fit"><img src={imagePreview} alt="معاينة صورة الإشعار" className="max-h-32 max-w-xs rounded-lg border border-neutral-200 object-cover" /><button type="button" onClick={clearImage} className="absolute -right-2 -top-2 rounded-full bg-rose-600 p-1 text-white shadow" aria-label="إزالة الصورة"><X size={14} /></button><p className="mt-1 max-w-xs truncate text-xs text-neutral-500">{imageName}</p></div>}
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs leading-5 text-neutral-500"><Users size={14} className="ml-1 inline" />سيصل الإشعار إلى من فعّل الإشعارات وسجّل رمز Push فقط. واتساب العادي يفتح رسالة جاهزة يدويًا من سجل الطلب، ولا يرسل تلقائيًا.</p>
             <button type="submit" disabled={sending || loading || !configured || audienceStats.readyToSend === 0 || !title.trim() || !body.trim()} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">{sending ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}{sending ? 'جارٍ الإرسال...' : 'إرسال الحملة'}</button>
