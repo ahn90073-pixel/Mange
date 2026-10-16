@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BellRing, Image, LoaderCircle, MessageCircle, PackageCheck, RefreshCw, Send, Users, X } from 'lucide-react'
+import { BellRing, Image, LoaderCircle, MapPin, MessageCircle, PackageCheck, RefreshCw, Send, Users, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { adminApi } from '../api/client'
 import { useDashboard } from '../context/DashboardContext'
-import { shipmentWhatsAppUrl } from '../utils/shipmentWhatsApp'
+import { shipmentWhatsAppUrl, whatsappChatUrl } from '../utils/shipmentWhatsApp'
 
 const audienceLabels = { customer: 'العملاء', merchant: 'التجار' }
 
@@ -41,6 +41,10 @@ export default function NotificationsPage() {
   const [status, setStatus] = useState(null)
   const [contacts, setContacts] = useState([])
   const [shipmentRequests, setShipmentRequests] = useState([])
+  const [customerDirectory, setCustomerDirectory] = useState([])
+  const [customerDirectoryPagination, setCustomerDirectoryPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 0 })
+  const [customerDirectoryPage, setCustomerDirectoryPage] = useState(1)
+  const [customerDirectoryError, setCustomerDirectoryError] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
@@ -49,6 +53,7 @@ export default function NotificationsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     if (audience === 'customer') setContacts([])
+    if (audience === 'customer') setCustomerDirectoryError('')
     try {
       const [nextStatus, nextContacts, nextShipmentRequests] = await Promise.all([
         adminApi.notificationStatus(),
@@ -58,12 +63,29 @@ export default function NotificationsPage() {
       setStatus(nextStatus)
       setContacts(audience === 'merchant' ? nextContacts?.items || [] : [])
       setShipmentRequests(nextShipmentRequests?.items || [])
+      if (audience === 'customer') {
+        try {
+          const nextDirectory = await adminApi.customerDirectory(customerDirectoryPage, 50)
+          setCustomerDirectory(nextDirectory?.items || [])
+          setCustomerDirectoryPagination(nextDirectory?.pagination || { page: customerDirectoryPage, limit: 50, total: 0, totalPages: 0 })
+          setCustomerDirectoryError('')
+        } catch (directoryError) {
+          setCustomerDirectory([])
+          setCustomerDirectoryPagination({ page: customerDirectoryPage, limit: 50, total: 0, totalPages: 0 })
+          setCustomerDirectoryError(directoryError.message || 'تعذر تحميل قائمة العملاء.')
+          showToast('error', directoryError.message || 'تعذر تحميل قائمة العملاء.')
+        }
+      } else {
+        setCustomerDirectory([])
+        setCustomerDirectoryPagination({ page: 1, limit: 50, total: 0, totalPages: 0 })
+        setCustomerDirectoryError('')
+      }
     } catch (error) {
       showToast('error', error.message || 'تعذر تحميل مركز الإشعارات.')
     } finally {
       setLoading(false)
     }
-  }, [audience, showToast])
+  }, [audience, customerDirectoryPage, showToast])
 
   useEffect(() => { void load() }, [load])
 
@@ -201,7 +223,7 @@ export default function NotificationsPage() {
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
             <p className="text-2xl font-bold text-neutral-900">{audienceStats.total}</p>
             {audience === 'customer' && <div aria-label="المدن التقريبية لتوكنات الجمهور" className="flex flex-wrap gap-1.5">
-              {customerCities.length ? customerCities.slice(0, 4).map((city) => <span key={`${city.city}-${city.region}-${city.country}`} title={[city.region, city.country].filter(Boolean).join('، ')} className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-800">{city.city} <bdi dir="ltr" className="mr-1 text-primary-600">{city.tokens}</bdi></span>) : <span className="text-xs text-neutral-400">لا توجد مدن مسجلة بعد</span>}
+              {customerCities.length ? customerCities.slice(0, 4).map((city, index) => <span key={`${city.city}-${index}`} className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-800">{city.city}</span>) : <span className="text-xs text-neutral-400">لا توجد مدن مسجلة بعد</span>}
               {customerCities.length > 4 && <span className="self-center text-xs text-neutral-500">+{customerCities.length - 4} مدن</span>}
             </div>}
           </div>
@@ -210,6 +232,38 @@ export default function NotificationsPage() {
         <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p><p className="mt-1 text-xs text-neutral-500">الحد الأقصى للحملة: 500 رمز</p></section>
         <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? 'كل العملاء' : (selectedStore?.companyName || 'كل التجار')}</p><p className="mt-1 text-xs text-neutral-500">{audience === 'customer' ? 'أجهزة العملاء المسجلة' : (companyId ? 'تاجر محدد' : 'كل التجار')}</p></section>
       </div>
+
+      {audience === 'customer' && <section className="card overflow-hidden">
+        <div className="flex flex-col gap-2 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 font-bold text-neutral-900"><Users size={18} className="text-primary-600" />العملاء حسب المدينة</h3>
+            <p className="mt-1 text-xs text-neutral-500">يعرض هذا القسم المدينة فقط؛ يظهر زر WhatsApp عند توفر رقم صالح، دون عرض أسماء العملاء أو توكناتهم.</p>
+          </div>
+          <span className="w-fit rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-800">إجمالي العملاء: {customerDirectoryPagination.total}</span>
+        </div>
+        {loading ? <div className="flex items-center justify-center gap-2 p-6 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ تحميل العملاء...</div> : customerDirectoryError ? (
+          <p role="alert" className="p-6 text-center text-sm text-rose-700">{customerDirectoryError}</p>
+        ) : customerDirectory.length === 0 ? (
+          <p className="p-6 text-center text-sm text-neutral-500">لا توجد سجلات عملاء في جدول التوكنات.</p>
+        ) : (
+          <>
+            <ul className="max-h-80 divide-y divide-neutral-100 overflow-y-auto">
+              {customerDirectory.map((customer, index) => {
+                const whatsappUrl = whatsappChatUrl(customer.whatsappPhone)
+                return <li key={`${customer.locationCity || customer.city || 'city'}-${index}`} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <span className="flex min-w-0 items-center gap-2 truncate text-sm font-semibold text-neutral-800"><MapPin size={15} className="shrink-0 text-neutral-400" />{customer.city || 'مدينة غير متاحة'}</span>
+                  {whatsappUrl && <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label={`فتح WhatsApp للعميل في ${customer.city || 'مدينة غير متاحة'}`} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"><MessageCircle size={14} />WhatsApp</a>}
+                </li>
+              })}
+            </ul>
+            {customerDirectoryPagination.totalPages > 1 && <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-3">
+              <button type="button" onClick={() => setCustomerDirectoryPage((page) => Math.max(1, page - 1))} disabled={customerDirectoryPagination.page <= 1 || loading} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50">السابق</button>
+              <span className="text-xs text-neutral-500">صفحة {customerDirectoryPagination.page} من {customerDirectoryPagination.totalPages}</span>
+              <button type="button" onClick={() => setCustomerDirectoryPage((page) => Math.min(customerDirectoryPagination.totalPages, page + 1))} disabled={customerDirectoryPagination.page >= customerDirectoryPagination.totalPages || loading} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50">التالي</button>
+            </div>}
+          </>
+        )}
+      </section>}
 
       <section className="card overflow-hidden">
         <div className="flex flex-col gap-2 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

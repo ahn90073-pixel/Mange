@@ -125,6 +125,7 @@ export const adminApi = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   notificationStatus: () => request('/notifications/status'),
   notificationContacts: (audience = '', page = 1, limit = 50) => request(`/notifications/contacts${pageQuery(page, limit, audience ? { audience } : {})}`),
+  customerDirectory: (page = 1, limit = 50) => request(`/notifications/customer-directory${pageQuery(page, limit)}`),
   shipmentActivationRequests: (status = 'all', limit = 50) => request(`/notifications/shipment-requests${pageQuery(1, limit, { status })}`),
   sendNotification: (campaign) => request('/notifications/send', { method: 'POST', body: campaign }),
   employees: () => request('/employees'),
