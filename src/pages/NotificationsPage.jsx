@@ -16,16 +16,14 @@ function formatLastSeen(value) {
   }
 }
 
-function formatApproxLocation(contact) {
-  const parts = [contact.locationCity, contact.locationRegion].filter(Boolean)
-  if (contact.locationCountry) {
-    try {
-      parts.push(new Intl.DisplayNames(['ar'], { type: 'region' }).of(contact.locationCountry) || contact.locationCountry)
-    } catch {
-      parts.push(contact.locationCountry)
-    }
-  }
-  return parts.join('، ') || 'غير متاح'
+function contactWhatsAppUrl(phoneValue, title, messageBody) {
+  const arabicDigits = String(phoneValue || '').replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+  let phone = arabicDigits.replace(/\D/g, '')
+  if (phone.startsWith('00')) phone = phone.slice(2)
+  if (phone.startsWith('0')) phone = `20${phone.slice(1)}`
+  if (phone.length < 8 || phone.length > 15 || phoneValue === '—') return ''
+  const text = [title.trim(), messageBody.trim()].filter(Boolean).join('\n\n')
+  return `https://wa.me/${phone}${text ? `?text=${encodeURIComponent(text)}` : ''}`
 }
 
 export default function NotificationsPage() {
@@ -256,7 +254,7 @@ export default function NotificationsPage() {
               <button type="button" aria-pressed={audience === 'merchant'} onClick={() => { setAudience('merchant'); setTargetTokenRef('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'merchant' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات التجار</button>
             </div>
             {audience === 'merchant' && <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">التاجر (اختياري)</span><select className="input" value={companyId} onChange={(event) => setCompanyId(event.target.value)}><option value="">كل التجار</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName || vendor.name || vendor.id}</option>)}</select></label>}
-            {audience === 'customer' && <div className="space-y-2 sm:col-span-2"><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">عميل محدد (اختياري)</span><select className="input" value={targetTokenRef} onChange={(event) => setTargetTokenRef(event.target.value)}><option value="">كل العملاء</option>{contacts.filter((contact) => contact.tokenRef).map((contact, index) => <option key={`${contact.tokenRef}-${index}`} value={contact.tokenRef}>{contact.name} — {formatApproxLocation(contact)} — {contact.whatsappPhone} — {contact.tokenHint}</option>)}</select><span className="text-xs text-neutral-500">عند اختيار عميل، يُرسل الإشعار إلى الجهاز المحدد فقط. مرجع التوكن مُجزّأ ولا يُعرض التوكن الكامل.</span></label>{targetTokenRef && (() => { const selected = contacts.find((contact) => contact.tokenRef === targetTokenRef); return selected ? <div className="grid gap-2 rounded-xl border border-primary-100 bg-primary-50 p-3 text-sm sm:grid-cols-3"><p><span className="text-xs text-neutral-500">العميل</span><br /><b>{selected.name}</b></p><p><span className="text-xs text-neutral-500">المدينة</span><br /><b>{formatApproxLocation(selected)}</b></p><p><span className="text-xs text-neutral-500">واتساب / رمز Push</span><br /><bdi dir="ltr" className="font-medium">{selected.whatsappPhone} / {selected.tokenHint}</bdi></p></div> : null })()}</div>}
+            {audience === 'customer' && <div className="space-y-2 sm:col-span-2"><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">عميل محدد (اختياري)</span><select className="input" value={targetTokenRef} onChange={(event) => setTargetTokenRef(event.target.value)}><option value="">كل العملاء</option>{contacts.filter((contact) => contact.tokenRef).map((contact, index) => <option key={`${contact.tokenRef}-${index}`} value={contact.tokenRef}>{contact.name} — {contact.locationCity || 'مدينة غير محددة'} — {contact.whatsappPhone}</option>)}</select><span className="text-xs text-neutral-500">عند اختيار عميل، يُرسل الإشعار إلى الجهاز المحدد فقط.</span></label>{targetTokenRef && (() => { const selected = contacts.find((contact) => contact.tokenRef === targetTokenRef); return selected ? <div className="grid gap-2 rounded-xl border border-primary-100 bg-primary-50 p-3 text-sm sm:grid-cols-3"><p><span className="text-xs text-neutral-500">العميل</span><br /><b>{selected.name}</b></p><p><span className="text-xs text-neutral-500">المدينة</span><br /><b>{selected.locationCity || 'غير محددة'}</b><span className="block text-xs text-neutral-500">{[selected.locationRegion, selected.locationCountry].filter(Boolean).join('، ')}</span></p><p><span className="text-xs text-neutral-500">رقم واتساب</span><br /><bdi dir="ltr" className="font-medium">{selected.whatsappPhone}</bdi></p></div> : null })()}</div>}
           </div>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">العنوان <span className="font-normal text-neutral-400">(120 حرفًا)</span></span><input required maxLength={120} className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="عنوان الإشعار" /></label>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">النص <span className="font-normal text-neutral-400">(500 حرف)</span></span><textarea required maxLength={500} rows={4} className="input resize-y" value={body} onChange={(event) => setBody(event.target.value)} placeholder="نص الرسالة التي ستظهر للمستلم" /></label>
@@ -277,9 +275,9 @@ export default function NotificationsPage() {
 
       <section className="card overflow-hidden">
         <div className="border-b border-neutral-100 px-5 py-4">
-          <h3 className="font-bold text-neutral-900">جدول توكنات {audience === 'customer' ? 'الجمهور' : 'التجار'}</h3>
+          <h3 className="font-bold text-neutral-900">جهات {audience === 'customer' ? 'الجمهور' : 'التجار'}</h3>
           <p className="mt-1 text-xs text-neutral-500">
-            اسم التاجر والشركة والموقع التقريبي من اتصال IP. لا تعرض القائمة التوكن كاملًا.
+            بيانات العميل والمدينة ورقم واتساب؛ لا يظهر التوكن أو أي جزء منه.
           </p>
         </div>
         {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ التحميل...</div> : contacts.length === 0 ? <p className="p-8 text-center text-sm text-neutral-500">لا توجد أجهزة مطابقة.</p> : (
@@ -287,14 +285,14 @@ export default function NotificationsPage() {
             <table className="w-full min-w-[1100px] text-right text-sm">
               <thead className="bg-neutral-50 text-xs text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3">اسم التاجر</th>
-                  <th className="px-4 py-3">اسم الشركة</th>
+                  <th className="px-4 py-3">{audience === 'customer' ? 'اسم العميل' : 'اسم التاجر'}</th>
+                  <th className="px-4 py-3">{audience === 'customer' ? 'العميل / المتجر' : 'اسم الشركة'}</th>
                   <th className="px-4 py-3">الهاتف</th>
-                  <th className="px-4 py-3">الموقع التقريبي</th>
+                  <th className="px-4 py-3">المدينة</th>
                   <th className="px-4 py-3">المنصة / الإصدار</th>
                   <th className="px-4 py-3">آخر نشاط</th>
-                  <th className="px-4 py-3">التوكن المختصر</th>
                   <th className="px-4 py-3">Push</th>
+                  {audience === 'customer' && <th className="px-4 py-3">واتساب</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -303,11 +301,11 @@ export default function NotificationsPage() {
                     <td className="px-4 py-3"><p className="font-semibold">{contact.name}</p></td>
                     <td className="px-4 py-3">{contact.companyName || contact.storeName || '—'}</td>
                     <td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td>
-                    <td className="px-4 py-3 text-xs text-neutral-600">{formatApproxLocation(contact)}</td>
+                    <td className="px-4 py-3 text-xs text-neutral-600">{contact.locationCity || 'غير محددة'}{contact.locationRegion ? <span className="block text-neutral-400">{contact.locationRegion}</span> : null}</td>
                     <td className="px-4 py-3">{contact.platform} / {contact.appVersion}</td>
                     <td className="px-4 py-3 text-xs text-neutral-600">{formatLastSeen(contact.lastSeenAt)}</td>
-                    <td dir="ltr" className="px-4 py-3 text-left font-mono text-xs text-neutral-500">{contact.tokenHint}</td>
                     <td className="px-4 py-3">{contact.pushEnabled && contact.hasPushToken ? <span className="badge-success">مفعّل</span> : <span className="badge-neutral">غير جاهز</span>}</td>
+                    {audience === 'customer' && <td className="px-4 py-3">{contact.whatsappPhone !== '—' ? <button type="button" onClick={(event) => { event.stopPropagation(); const url = contactWhatsAppUrl(contact.whatsappPhone, title, body); if (url) window.open(url, '_blank', 'noopener,noreferrer'); else showToast('error', 'رقم واتساب غير صالح.') }} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800"><MessageCircle size={14} />إرسال رسالة واتساب</button> : <span className="text-xs text-neutral-400">لا يوجد رقم</span>}</td>}
                   </tr>
                 ))}
               </tbody>
