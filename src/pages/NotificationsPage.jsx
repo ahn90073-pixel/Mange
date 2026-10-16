@@ -38,6 +38,7 @@ export default function NotificationsPage() {
   const [imageName, setImageName] = useState('')
   const [imagePreview, setImagePreview] = useState('')
   const [companyId, setCompanyId] = useState('')
+  const [targetTokenRef, setTargetTokenRef] = useState('')
   const [status, setStatus] = useState(null)
   const [contacts, setContacts] = useState([])
   const [shipmentRequests, setShipmentRequests] = useState([])
@@ -48,15 +49,15 @@ export default function NotificationsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    if (audience === 'customer') setContacts([])
+    setContacts([])
     try {
       const [nextStatus, nextContacts, nextShipmentRequests] = await Promise.all([
         adminApi.notificationStatus(),
-        audience === 'merchant' ? adminApi.notificationContacts('merchant', 1, 50) : Promise.resolve(null),
+        adminApi.notificationContacts(audience, 1, 100),
         adminApi.shipmentActivationRequests('all', 50),
       ])
       setStatus(nextStatus)
-      setContacts(audience === 'merchant' ? nextContacts?.items || [] : [])
+      setContacts(nextContacts?.items || [])
       setShipmentRequests(nextShipmentRequests?.items || [])
     } catch (error) {
       showToast('error', error.message || 'تعذر تحميل مركز الإشعارات.')
@@ -77,7 +78,7 @@ export default function NotificationsPage() {
     const requestedAudience = searchParams.get('audience')
     if (audienceLabels[requestedAudience]) {
       setAudience(requestedAudience)
-      if (requestedAudience === 'customer') setCompanyId('')
+      if (requestedAudience === 'customer') { setCompanyId(''); setTargetTokenRef('') }
     }
   }, [searchParams])
 
@@ -92,6 +93,7 @@ export default function NotificationsPage() {
         body: body.trim(),
         ...(imageData ? { imageData, imageName } : {}),
         ...(companyId ? { companyId } : {}),
+        ...(audience === 'customer' && targetTokenRef ? { targetTokenRef } : {}),
       })
       setResult(response)
       showToast('success', 'تم تنفيذ حملة الإشعار.')
@@ -208,7 +210,7 @@ export default function NotificationsPage() {
           <p className="mt-1 text-xs text-neutral-500">المفعّل منهم: {audienceStats.optedIn}</p>
         </section>
         <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p><p className="mt-1 text-xs text-neutral-500">الحد الأقصى للحملة: 500 رمز</p></section>
-        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? 'كل العملاء' : (selectedStore?.companyName || 'كل التجار')}</p><p className="mt-1 text-xs text-neutral-500">{audience === 'customer' ? 'أجهزة العملاء المسجلة' : (companyId ? 'تاجر محدد' : 'كل التجار')}</p></section>
+        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? (targetTokenRef ? (contacts.find((contact) => contact.tokenRef === targetTokenRef)?.name || 'عميل محدد') : 'كل العملاء') : (selectedStore?.companyName || 'كل التجار')}</p><p className="mt-1 text-xs text-neutral-500">{audience === 'customer' ? (targetTokenRef ? 'جهاز العميل المحدد فقط' : 'أجهزة العملاء المسجلة') : (companyId ? 'تاجر محدد' : 'كل التجار')}</p></section>
       </div>
 
       <section className="card overflow-hidden">
@@ -251,9 +253,10 @@ export default function NotificationsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div role="group" aria-label="اختيار جمهور الإشعارات" className="grid grid-cols-2 gap-2 sm:col-span-2">
               <button type="button" aria-pressed={audience === 'customer'} onClick={() => { setAudience('customer'); setCompanyId('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'customer' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات الجمهور</button>
-              <button type="button" aria-pressed={audience === 'merchant'} onClick={() => setAudience('merchant')} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'merchant' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات التجار</button>
+              <button type="button" aria-pressed={audience === 'merchant'} onClick={() => { setAudience('merchant'); setTargetTokenRef('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'merchant' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات التجار</button>
             </div>
             {audience === 'merchant' && <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">التاجر (اختياري)</span><select className="input" value={companyId} onChange={(event) => setCompanyId(event.target.value)}><option value="">كل التجار</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName || vendor.name || vendor.id}</option>)}</select></label>}
+            {audience === 'customer' && <div className="space-y-2 sm:col-span-2"><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">عميل محدد (اختياري)</span><select className="input" value={targetTokenRef} onChange={(event) => setTargetTokenRef(event.target.value)}><option value="">كل العملاء</option>{contacts.filter((contact) => contact.tokenRef).map((contact, index) => <option key={`${contact.tokenRef}-${index}`} value={contact.tokenRef}>{contact.name} — {formatApproxLocation(contact)} — {contact.whatsappPhone} — {contact.tokenHint}</option>)}</select><span className="text-xs text-neutral-500">عند اختيار عميل، يُرسل الإشعار إلى الجهاز المحدد فقط. مرجع التوكن مُجزّأ ولا يُعرض التوكن الكامل.</span></label>{targetTokenRef && (() => { const selected = contacts.find((contact) => contact.tokenRef === targetTokenRef); return selected ? <div className="grid gap-2 rounded-xl border border-primary-100 bg-primary-50 p-3 text-sm sm:grid-cols-3"><p><span className="text-xs text-neutral-500">العميل</span><br /><b>{selected.name}</b></p><p><span className="text-xs text-neutral-500">المدينة</span><br /><b>{formatApproxLocation(selected)}</b></p><p><span className="text-xs text-neutral-500">واتساب / رمز Push</span><br /><bdi dir="ltr" className="font-medium">{selected.whatsappPhone} / {selected.tokenHint}</bdi></p></div> : null })()}</div>}
           </div>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">العنوان <span className="font-normal text-neutral-400">(120 حرفًا)</span></span><input required maxLength={120} className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="عنوان الإشعار" /></label>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">النص <span className="font-normal text-neutral-400">(500 حرف)</span></span><textarea required maxLength={500} rows={4} className="input resize-y" value={body} onChange={(event) => setBody(event.target.value)} placeholder="نص الرسالة التي ستظهر للمستلم" /></label>
@@ -265,16 +268,16 @@ export default function NotificationsPage() {
             {imagePreview && <div className="relative mt-3 w-fit"><img src={imagePreview} alt="معاينة صورة الإشعار" className="max-h-32 max-w-xs rounded-lg border border-neutral-200 object-cover" /><button type="button" onClick={clearImage} className="absolute -right-2 -top-2 rounded-full bg-rose-600 p-1 text-white shadow" aria-label="إزالة الصورة"><X size={14} /></button><p className="mt-1 max-w-xs truncate text-xs text-neutral-500">{imageName}</p></div>}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-5 text-neutral-500"><Users size={14} className="ml-1 inline" />سيصل الإشعار إلى من فعّل الإشعارات وسجّل رمز Push فقط. واتساب العادي يفتح رسالة جاهزة يدويًا من سجل الطلب، ولا يرسل تلقائيًا.</p>
-            <button type="submit" disabled={sending || loading || !configured || audienceStats.readyToSend === 0 || !title.trim() || !body.trim()} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">{sending ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}{sending ? 'جارٍ الإرسال...' : 'إرسال الحملة'}</button>
+            <p className="text-xs leading-5 text-neutral-500"><Users size={14} className="ml-1 inline" />{targetTokenRef ? 'سيصل الإشعار المخصص إلى الجهاز المحدد فقط. رقم واتساب للعرض والتواصل اليدوي، ولا يُرسل عبر واتساب تلقائيًا.' : 'سيصل الإشعار إلى من فعّل الإشعارات وسجّل رمز Push فقط. واتساب لا يرسل تلقائيًا.'}</p>
+            <button type="submit" disabled={sending || loading || !configured || (targetTokenRef ? !contacts.some((contact) => contact.tokenRef === targetTokenRef && contact.pushEnabled && contact.hasPushToken) : audienceStats.readyToSend === 0) || !title.trim() || !body.trim()} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">{sending ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}{sending ? 'جارٍ الإرسال...' : 'إرسال الحملة'}</button>
           </div>
         </form>
         {result && <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">نتيجة الإرسال: <b>{result.sent}</b> ناجح، <b>{result.failed}</b> فاشل، من أصل <b>{result.total}</b> مستلم.</div>}
       </section>
 
-      {audience === 'merchant' && <section className="card overflow-hidden">
+      <section className="card overflow-hidden">
         <div className="border-b border-neutral-100 px-5 py-4">
-          <h3 className="font-bold text-neutral-900">جدول توكنات التجار</h3>
+          <h3 className="font-bold text-neutral-900">جدول توكنات {audience === 'customer' ? 'الجمهور' : 'التجار'}</h3>
           <p className="mt-1 text-xs text-neutral-500">
             اسم التاجر والشركة والموقع التقريبي من اتصال IP. لا تعرض القائمة التوكن كاملًا.
           </p>
@@ -296,7 +299,7 @@ export default function NotificationsPage() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {contacts.map((contact, index) => (
-                  <tr key={`${contact.companyId}-${contact.whatsappPhone}-${index}`} className="table-row-hover">
+                  <tr key={`${contact.tokenRef || contact.companyId}-${contact.whatsappPhone}-${index}`} onClick={() => audience === 'customer' && contact.tokenRef && setTargetTokenRef(contact.tokenRef)} className={`table-row-hover ${audience === 'customer' && contact.tokenRef ? 'cursor-pointer' : ''} ${targetTokenRef === contact.tokenRef ? 'bg-primary-50' : ''}`}>
                     <td className="px-4 py-3"><p className="font-semibold">{contact.name}</p></td>
                     <td className="px-4 py-3">{contact.companyName || contact.storeName || '—'}</td>
                     <td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td>
@@ -311,7 +314,7 @@ export default function NotificationsPage() {
             </table>
           </div>
         )}
-      </section>}
+      </section>
     </div>
   )
 }
