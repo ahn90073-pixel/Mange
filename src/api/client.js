@@ -145,7 +145,7 @@ export const adminApi = {
     method: 'PATCH', body: { isActive },
   }),
   dashboard: () => request('/dashboard'),
-  orders: (page = 1, limit = 100, status = 'all', q = '') => request(`/orders${pageQuery(page, limit, { status, q })}`),
+  orders: (page = 1, limit = 100, status = 'all', q = '', shipmentStatus = 'all') => request(`/orders${pageQuery(page, limit, { status, q, shipmentStatus })}`),
   order: (vendorId, orderId) => request(`/orders/${encodeURIComponent(vendorId)}/${encodeURIComponent(orderId)}`),
   updateOrder: (vendorId, orderId, update) => request(
     `/orders/${encodeURIComponent(vendorId)}/${encodeURIComponent(orderId)}`,

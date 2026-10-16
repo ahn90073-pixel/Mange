@@ -62,6 +62,7 @@ export default function NotificationsPage() {
   useEffect(() => { void load() }, [load])
 
   const audienceStats = status?.audiences?.[audience] || { readyToSend: 0, optedIn: 0, total: 0 }
+  const customerCities = audience === 'customer' && Array.isArray(status?.customerCities) ? status.customerCities : []
   const configured = Boolean(status?.configured?.[audience])
   const requiredSecret = audience === 'customer' ? 'FCM_PUBLIC_SERVICE_ACCOUNT_JSON' : 'FCM_SERVICE_ACCOUNT_JSON'
   const selectedStore = useMemo(() => vendors.find((vendor) => vendor.id === companyId), [companyId, vendors])
@@ -140,7 +141,17 @@ export default function NotificationsPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <section className="card p-4"><p className="text-xs text-neutral-500">جهات {audienceLabels[audience]}</p><p className="mt-2 text-2xl font-bold text-neutral-900">{audienceStats.total}</p><p className="mt-1 text-xs text-neutral-500">المفعّل منهم: {audienceStats.optedIn}</p></section>
+        <section className="card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-neutral-500">جهات {audienceLabels[audience]}</p>{audience === 'customer' && <span className="text-[11px] font-semibold text-neutral-400">المدن التقريبية</span>}</div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <p className="text-2xl font-bold text-neutral-900">{audienceStats.total}</p>
+            {audience === 'customer' && <div aria-label="المدن التقريبية لتوكنات الجمهور" className="flex flex-wrap gap-1.5">
+              {customerCities.length ? customerCities.slice(0, 4).map((city) => <span key={`${city.city}-${city.region}-${city.country}`} title={[city.region, city.country].filter(Boolean).join('، ')} className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-800">{city.city} <bdi dir="ltr" className="mr-1 text-primary-600">{city.tokens}</bdi></span>) : <span className="text-xs text-neutral-400">لا توجد مدن مسجلة بعد</span>}
+              {customerCities.length > 4 && <span className="self-center text-xs text-neutral-500">+{customerCities.length - 4} مدن</span>}
+            </div>}
+          </div>
+          <p className="mt-1 text-xs text-neutral-500">المفعّل منهم: {audienceStats.optedIn}</p>
+        </section>
         <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p><p className="mt-1 text-xs text-neutral-500">الحد الأقصى للحملة: 500 رمز</p></section>
         <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? 'كل العملاء' : (selectedStore?.companyName || 'كل التجار')}</p><p className="mt-1 text-xs text-neutral-500">{audience === 'customer' ? 'أجهزة العملاء المسجلة' : (companyId ? 'تاجر محدد' : 'كل التجار')}</p></section>
       </div>

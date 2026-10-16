@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, LoaderCircle, RefreshCw, Search, ShoppingBag, Truck, X } from 'lucide-react'
+import { Copy, LoaderCircle, MessageCircle, RefreshCw, Search, ShoppingBag, Truck, X } from 'lucide-react'
 import { adminApi } from '../api/client'
 import { orderStatusMap } from '../data/mockData'
 import { useDashboard } from '../context/DashboardContext'
@@ -34,6 +34,52 @@ function internationalPhone(value) {
   return digits
 }
 
+const shipmentStatusOptions = [
+  ['pending', 'بانتظار التجهيز'],
+  ['label_created', 'تم إنشاء بوليصة'],
+  ['ready', 'جهزها التاجر للشحن'],
+  ['picked_up', 'استلمتها شركة الشحن'],
+  ['in_transit', 'في الطريق'],
+  ['delivered', 'تم التسليم'],
+  ['failed', 'تعذر التسليم'],
+  ['returned', 'مرتجع'],
+]
+const shipmentStatusStyles = {
+  pending: 'bg-neutral-100 text-neutral-700',
+  label_created: 'bg-sky-100 text-sky-800',
+  ready: 'bg-amber-100 text-amber-800',
+  picked_up: 'bg-indigo-100 text-indigo-800',
+  in_transit: 'bg-blue-100 text-blue-800',
+  delivered: 'bg-emerald-100 text-emerald-800',
+  failed: 'bg-rose-100 text-rose-800',
+  returned: 'bg-orange-100 text-orange-800',
+}
+const whatsappShipmentStatuses = new Set(['ready', 'picked_up', 'in_transit', 'delivered'])
+
+function shipmentWhatsAppUrl(order) {
+  const phone = internationalPhone(order.customer?.phone || order.customerPhone)
+  const shipmentStatus = order.shipment?.status || order.shipmentStatus || 'pending'
+  if (!phone || !whatsappShipmentStatuses.has(shipmentStatus)) return ''
+
+  const orderNumber = order.id || order.orderNumber || order.orderId || '—'
+  const customerName = typeof order.customer === 'string' ? order.customer : order.customer?.name
+  const vendorName = order.vendor?.name || order.vendorName || 'المتجر'
+  const carrier = order.shipment?.carrier || order.carrier || ''
+  const trackingNumber = order.shipment?.trackingNumber || order.trackingNumber || ''
+  const shipmentMessage = shipmentStatus === 'ready'
+    ? `تم تجهيز طرد طلبك رقم ${orderNumber} للشحن من ${vendorName}.`
+    : shipmentStatus === 'delivered'
+      ? `تم تسجيل تسليم طلبك رقم ${orderNumber} من ${vendorName}.`
+      : `تم شحن طرد طلبك رقم ${orderNumber} من ${vendorName}.`
+  const message = [
+    customerName ? `مرحبًا ${customerName}،` : 'مرحبًا،',
+    shipmentMessage,
+    carrier ? `شركة الشحن: ${carrier}` : '',
+    trackingNumber ? `رقم التتبع: ${trackingNumber}` : '',
+  ].filter(Boolean).join('\n')
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+}
+
 function Field({ label, children }) {
   return <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">{label}</span>{children}</label>
 }
@@ -46,8 +92,7 @@ function OrderDetails({ order, onClose, onUpdated }) {
   const [shipmentStatus, setShipmentStatus] = useState(order.shipment.status || 'pending')
   const [shippingFee, setShippingFee] = useState(String(order.totals.shipping || 0))
   const [saving, setSaving] = useState(false)
-  const whatsappPhone = internationalPhone(order.customer.phone)
-  const whatsappUrl = whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(`طلب رقم ${order.order_number || order.id}\nتم تجهيز طردك`)}` : ''
+  const whatsappUrl = shipmentWhatsAppUrl(order)
 
   const changeOrderStatus = (nextStatus) => {
     setStatus(nextStatus)
@@ -189,6 +234,7 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('all')
   const [query, setQuery] = useState('')
+  const [shipmentStatusFilter, setShipmentStatusFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -196,7 +242,7 @@ export default function OrdersPage() {
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await adminApi.orders(page, 50, status, query.trim())
+      const result = await adminApi.orders(page, 50, status, query.trim(), shipmentStatusFilter)
       setOrders(result?.items || [])
       setPagination(result?.pagination || null)
     } catch (error) {
@@ -204,7 +250,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, query, showToast, status])
+  }, [page, query, shipmentStatusFilter, showToast, status])
 
   useEffect(() => { void loadOrders() }, [loadOrders])
 
@@ -240,16 +286,29 @@ export default function OrdersPage() {
       <div className="card flex flex-col gap-3 p-4 sm:flex-row">
         <div className="relative flex-1"><Search size={17} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400" /><input className="input pr-10" value={query} onChange={(event) => { setPage(1); setQuery(event.target.value) }} placeholder="ابحث برقم الطلب أو اسم العميل أو التاجر" /></div>
         <select className="input sm:max-w-56" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="all">جميع الحالات</option>{statusOptions.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select aria-label="تصفية حسب حالة الشحنة" className="input sm:max-w-56" value={shipmentStatusFilter} onChange={(event) => { setPage(1); setShipmentStatusFilter(event.target.value) }}><option value="all">كل حالات الشحنة</option>{shipmentStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
       </div>
+      {shipmentStatusFilter === 'ready' && <p className="-mt-3 text-xs leading-5 text-neutral-500">يعرض هذا الاختيار الطرود التي أكد التاجر تجهيزها. زر WhatsApp يفتح رسالة جاهزة للمراجعة ولا يرسلها تلقائيًا.</p>}
 
       <section className="card overflow-hidden">
         {loading ? <div className="flex items-center justify-center gap-3 p-12 text-sm text-neutral-500"><LoaderCircle size={18} className="animate-spin text-primary-600" />جارٍ تحميل الطلبات...</div> : orders.length === 0 ? <div className="p-12 text-center"><ShoppingBag size={34} className="mx-auto text-neutral-300" /><p className="mt-3 font-semibold text-neutral-700">لا توجد طلبات مطابقة</p><p className="mt-1 text-sm text-neutral-500">ستظهر طلبات المتجر الجديدة هنا بعد إتمام الشراء.</p></div> : (
-          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-right">
-            <thead className="bg-neutral-50 text-xs text-neutral-500"><tr><th className="px-4 py-3 font-semibold">رقم الطلب</th><th className="px-4 py-3 font-semibold">العميل</th><th className="px-4 py-3 font-semibold">التاجر</th><th className="px-4 py-3 font-semibold">الحالة</th><th className="px-4 py-3 font-semibold">الإجمالي</th><th className="px-4 py-3 font-semibold">التاريخ</th><th className="px-4 py-3 font-semibold">التفاصيل</th></tr></thead>
+          <div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-right">
+            <thead className="bg-neutral-50 text-xs text-neutral-500"><tr><th className="px-4 py-3 font-semibold">رقم الطلب</th><th className="px-4 py-3 font-semibold">العميل</th><th className="px-4 py-3 font-semibold">التاجر</th><th className="px-4 py-3 font-semibold">حالة الطلب</th><th className="px-4 py-3 font-semibold">حالة الشحنة</th><th className="px-4 py-3 font-semibold">الإجمالي</th><th className="px-4 py-3 font-semibold">التاريخ</th><th className="px-4 py-3 font-semibold">واتساب</th><th className="px-4 py-3 font-semibold">التفاصيل</th></tr></thead>
             <tbody className="divide-y divide-neutral-100">{orders.map((order) => {
               const orderStatus = orderStatusMap[order.status] || { label: order.status || '—', class: 'badge-neutral' }
+              const shipmentStatus = order.shipmentStatus || 'pending'
+              const shipmentLabel = shipmentStatusOptions.find(([value]) => value === shipmentStatus)?.[1] || shipmentStatus
+              const whatsappUrl = shipmentWhatsAppUrl(order)
               return <tr key={`${order.vendorId}-${order.orderId}`} className="table-row-hover">
-                <td className="px-4 py-3 font-semibold text-neutral-800">{order.id}</td><td className="px-4 py-3 text-sm text-neutral-700">{order.customer || '—'}</td><td className="px-4 py-3 text-sm text-neutral-700">{order.vendorName || '—'}</td><td className="px-4 py-3"><span className={orderStatus.class}>{orderStatus.label}</span></td><td className="px-4 py-3 text-sm font-bold text-neutral-800">{formatCurrency(order.amount, order.currency)}</td><td className="px-4 py-3 text-xs text-neutral-500">{formatDate(order.date)}</td><td className="px-4 py-3"><button type="button" onClick={() => openOrder(order)} className="btn-ghost px-3 py-2 text-xs">{detailLoading ? 'تحميل...' : 'فتح الطلب'}</button></td>
+                <td className="px-4 py-3 font-semibold text-neutral-800">{order.id}</td>
+                <td className="px-4 py-3 text-sm text-neutral-700">{order.customer || '—'}</td>
+                <td className="px-4 py-3 text-sm text-neutral-700">{order.vendorName || '—'}</td>
+                <td className="px-4 py-3"><span className={orderStatus.class}>{orderStatus.label}</span></td>
+                <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${shipmentStatusStyles[shipmentStatus] || 'bg-neutral-100 text-neutral-700'}`}>{shipmentLabel}</span>{order.carrier && <p className="mt-1 text-xs text-neutral-500">{order.carrier}</p>}{order.trackingNumber && <p dir="ltr" className="mt-1 text-left text-xs text-neutral-500">{order.trackingNumber}</p>}</td>
+                <td className="px-4 py-3 text-sm font-bold text-neutral-800">{formatCurrency(order.amount, order.currency)}</td>
+                <td className="px-4 py-3 text-xs text-neutral-500">{formatDate(order.date)}</td>
+                <td className="px-4 py-3">{whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="btn-success whitespace-nowrap px-3 py-2 text-xs"><MessageCircle size={14} />رسالة الشحن</a> : <span className="text-xs text-neutral-400">غير متاح</span>}</td>
+                <td className="px-4 py-3"><button type="button" onClick={() => openOrder(order)} className="btn-ghost px-3 py-2 text-xs">{detailLoading ? 'تحميل...' : 'فتح الطلب'}</button></td>
               </tr>
             })}</tbody>
           </table></div>
