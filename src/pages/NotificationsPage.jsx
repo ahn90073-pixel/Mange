@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BellRing, Image, LoaderCircle, RefreshCw, Send, Users, X } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { ArrowUpRight, BellRing, Image, LoaderCircle, PackageCheck, RefreshCw, Send, Users, X } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { adminApi } from '../api/client'
 import { useDashboard } from '../context/DashboardContext'
 
@@ -30,6 +30,7 @@ function formatApproxLocation(contact) {
 export default function NotificationsPage() {
   const { vendors, showToast } = useDashboard()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [audience, setAudience] = useState('customer')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -39,6 +40,7 @@ export default function NotificationsPage() {
   const [companyId, setCompanyId] = useState('')
   const [status, setStatus] = useState(null)
   const [contacts, setContacts] = useState([])
+  const [shipmentRequests, setShipmentRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
@@ -47,12 +49,14 @@ export default function NotificationsPage() {
     setLoading(true)
     if (audience === 'customer') setContacts([])
     try {
-      const [nextStatus, nextContacts] = await Promise.all([
+      const [nextStatus, nextContacts, nextShipmentRequests] = await Promise.all([
         adminApi.notificationStatus(),
         audience === 'merchant' ? adminApi.notificationContacts('merchant', 1, 50) : Promise.resolve(null),
+        adminApi.shipmentActivationRequests('all', 50),
       ])
       setStatus(nextStatus)
       setContacts(audience === 'merchant' ? nextContacts?.items || [] : [])
+      setShipmentRequests(nextShipmentRequests?.items || [])
     } catch (error) {
       showToast('error', error.message || 'تعذر تحميل مركز الإشعارات.')
     } finally {
@@ -156,6 +160,37 @@ export default function NotificationsPage() {
         <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p><p className="mt-1 text-xs text-neutral-500">الحد الأقصى للحملة: 500 رمز</p></section>
         <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? 'كل العملاء' : (selectedStore?.companyName || 'كل التجار')}</p><p className="mt-1 text-xs text-neutral-500">{audience === 'customer' ? 'أجهزة العملاء المسجلة' : (companyId ? 'تاجر محدد' : 'كل التجار')}</p></section>
       </div>
+
+      <section className="card overflow-hidden">
+        <div className="flex flex-col gap-2 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 font-bold text-neutral-900"><PackageCheck size={18} className="text-primary-600" />طلبات تفعيل الشحن من التجار</h3>
+            <p className="mt-1 text-xs text-neutral-500">طلب التفعيل لا يرسل إشعارًا للعميل؛ تجهيز الطرد وإشعار العميل يتمان من صفحة الطلبات بعد مراجعة الإدارة.</p>
+          </div>
+          <span className="w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">بانتظار الإدارة: {shipmentRequests.filter((request) => request.status === 'pending').length}</span>
+        </div>
+        {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ تحميل طلبات الشحن...</div> : shipmentRequests.length === 0 ? (
+          <p className="p-8 text-center text-sm text-neutral-500">لا توجد طلبات تفعيل شحن حتى الآن.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-right text-sm">
+              <thead className="bg-neutral-50 text-xs text-neutral-500"><tr>
+                <th className="px-4 py-3">رقم الطلب</th><th className="px-4 py-3">التاجر / المتجر</th><th className="px-4 py-3">مرسل الطلب</th><th className="px-4 py-3">وقت الطلب</th><th className="px-4 py-3">الحالة</th><th className="px-4 py-3">إجراء</th>
+              </tr></thead>
+              <tbody className="divide-y divide-neutral-100">
+                {shipmentRequests.map((request) => <tr key={request.id} className="table-row-hover">
+                  <td className="px-4 py-3 font-bold text-neutral-800" dir="ltr">{request.orderNumber}</td>
+                  <td className="px-4 py-3">{request.companyName || '—'}</td>
+                  <td className="px-4 py-3">{request.requestedBy || '—'}</td>
+                  <td className="px-4 py-3 text-xs text-neutral-600">{formatLastSeen(request.requestedAt)}</td>
+                  <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${request.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{request.status === 'pending' ? 'بانتظار الإدارة' : 'تم تجهيزها من الإدارة'}</span></td>
+                  <td className="px-4 py-3"><button type="button" onClick={() => navigate('/orders')} className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50">فتح الطلبات <ArrowUpRight size={14} /></button></td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="card p-5 sm:p-6">
         <div className="mb-5 flex items-center gap-2"><BellRing size={19} className="text-primary-600" /><h3 className="font-bold text-neutral-900">إنشاء حملة</h3></div>
