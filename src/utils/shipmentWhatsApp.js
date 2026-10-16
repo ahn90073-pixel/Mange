@@ -6,6 +6,11 @@ function internationalPhone(value) {
   return digits
 }
 
+export function whatsappChatUrl(phone) {
+  const digits = internationalPhone(phone)
+  return digits.length >= 8 && digits.length <= 15 ? `https://wa.me/${digits}` : ''
+}
+
 export function shipmentWhatsAppUrl(order) {
   const phone = internationalPhone(order.customer?.phone || order.customerPhone)
   const shipmentStatus = order.shipment?.status || order.shipmentStatus || 'pending'
