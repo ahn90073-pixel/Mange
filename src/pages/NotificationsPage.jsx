@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, BellRing, Image, LoaderCircle, PackageCheck, RefreshCw, Send, Users, X } from 'lucide-react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { BellRing, Image, LoaderCircle, MessageCircle, PackageCheck, RefreshCw, Send, Users, X } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { adminApi } from '../api/client'
 import { useDashboard } from '../context/DashboardContext'
+import { shipmentWhatsAppUrl } from '../utils/shipmentWhatsApp'
 
 const audienceLabels = { customer: 'العملاء', merchant: 'التجار' }
 
@@ -30,7 +31,6 @@ function formatApproxLocation(contact) {
 export default function NotificationsPage() {
   const { vendors, showToast } = useDashboard()
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const [audience, setAudience] = useState('customer')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -44,6 +44,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
+  const [processingShipmentRequestId, setProcessingShipmentRequestId] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -98,6 +99,55 @@ export default function NotificationsPage() {
       showToast('error', error.message || 'تعذر إرسال الحملة.')
     } finally {
       setSending(false)
+    }
+  }
+
+  const notifyPreparedShipment = async (shipmentRequest) => {
+    setProcessingShipmentRequestId(shipmentRequest.id)
+    const whatsappWindow = window.open('about:blank', '_blank')
+    try {
+      const updated = await adminApi.updateOrder(shipmentRequest.companyId, shipmentRequest.orderId, { shipmentStatus: 'ready' })
+      const whatsappUrl = shipmentWhatsAppUrl(updated)
+      let whatsappSummary = ''
+      if (whatsappUrl && whatsappWindow) {
+        whatsappWindow.location.href = whatsappUrl
+        whatsappSummary = 'فُتحت مسودة WhatsApp للمراجعة؛ اضغط إرسال يدويًا بعد مراجعتها.'
+      } else {
+        if (whatsappWindow) whatsappWindow.close()
+        whatsappSummary = whatsappUrl
+          ? 'تعذر فتح WhatsApp؛ اسمح بالنوافذ المنبثقة في المتصفح.'
+          : 'لا يتوفر رقم هاتف صالح لفتح WhatsApp.'
+      }
+
+      setShipmentRequests((current) => current.map((request) => request.id === shipmentRequest.id
+        ? { ...request, status: 'processed', processedAt: new Date().toISOString() }
+        : request))
+
+      const notification = updated.notification || {}
+      let pushSummary = ''
+      let toastType = 'error'
+      if (notification.status === 'sent') {
+        pushSummary = `تم إرسال Push إلى ${notification.sent} جهاز.`
+        toastType = 'success'
+      } else if (notification.status === 'completed_with_failures') {
+        pushSummary = `نتيجة Push: نجح ${notification.sent} وفشل ${notification.failed}.`
+      } else if (notification.status === 'no_tokens') {
+        pushSummary = 'حُفظت حالة التجهيز لكن لا توجد أجهزة عميل مسجلة لإشعار Push.'
+      } else if (notification.status === 'not_configured') {
+        pushSummary = 'حُفظت حالة التجهيز لكن إعداد Push غير مكتمل.'
+      } else if (notification.status === 'no_customer_phone') {
+        pushSummary = 'حُفظت حالة التجهيز لكن رقم هاتف العميل غير متاح لخدمة الإشعار.'
+      } else if (notification.status === 'not_requested') {
+        pushSummary = 'حُفظت الحالة؛ لم يُرسل Push جديد لأن الشحنة كانت مجهزة مسبقًا.'
+      } else {
+        pushSummary = 'حُفظت حالة التجهيز لكن تعذر إرسال Push.'
+      }
+      showToast(toastType, `${pushSummary} ${whatsappSummary}`)
+    } catch (error) {
+      if (whatsappWindow) whatsappWindow.close()
+      showToast('error', error.message || 'تعذر إرسال إشعار الشحن وفتح WhatsApp.')
+    } finally {
+      setProcessingShipmentRequestId('')
     }
   }
 
@@ -164,18 +214,18 @@ export default function NotificationsPage() {
       <section className="card overflow-hidden">
         <div className="flex flex-col gap-2 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="flex items-center gap-2 font-bold text-neutral-900"><PackageCheck size={18} className="text-primary-600" />طلبات تفعيل الشحن من التجار</h3>
-            <p className="mt-1 text-xs text-neutral-500">طلب التفعيل لا يرسل إشعارًا للعميل؛ تجهيز الطرد وإشعار العميل يتمان من صفحة الطلبات بعد مراجعة الإدارة.</p>
+            <h3 className="flex items-center gap-2 font-bold text-neutral-900"><PackageCheck size={18} className="text-primary-600" />طرود جهزها التجار — بانتظار إشعار العميل</h3>
+            <p className="mt-1 text-xs text-neutral-500">بعد ضغط التاجر «تم التجهيز»، يظهر الطلب هنا. الزر يرسل Push ويفتح مسودة WhatsApp؛ إرسال WhatsApp النهائي يدوي بعد المراجعة.</p>
           </div>
-          <span className="w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">بانتظار الإدارة: {shipmentRequests.filter((request) => request.status === 'pending').length}</span>
+          <span className="w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">بانتظار الإشعار: {shipmentRequests.filter((request) => request.status === 'pending').length}</span>
         </div>
-        {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ تحميل طلبات الشحن...</div> : shipmentRequests.length === 0 ? (
-          <p className="p-8 text-center text-sm text-neutral-500">لا توجد طلبات تفعيل شحن حتى الآن.</p>
+        {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ تحميل الطرود المجهزة...</div> : shipmentRequests.length === 0 ? (
+          <p className="p-8 text-center text-sm text-neutral-500">لا توجد طرود مجهزة تنتظر الإشعار.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-right text-sm">
+            <table className="w-full min-w-[850px] text-right text-sm">
               <thead className="bg-neutral-50 text-xs text-neutral-500"><tr>
-                <th className="px-4 py-3">رقم الطلب</th><th className="px-4 py-3">التاجر / المتجر</th><th className="px-4 py-3">مرسل الطلب</th><th className="px-4 py-3">وقت الطلب</th><th className="px-4 py-3">الحالة</th><th className="px-4 py-3">إجراء</th>
+                <th className="px-4 py-3">رقم الطلب</th><th className="px-4 py-3">التاجر / المتجر</th><th className="px-4 py-3">مرسل الطلب</th><th className="px-4 py-3">وقت التجهيز</th><th className="px-4 py-3">الحالة</th><th className="px-4 py-3">الإشعار</th>
               </tr></thead>
               <tbody className="divide-y divide-neutral-100">
                 {shipmentRequests.map((request) => <tr key={request.id} className="table-row-hover">
@@ -183,8 +233,11 @@ export default function NotificationsPage() {
                   <td className="px-4 py-3">{request.companyName || '—'}</td>
                   <td className="px-4 py-3">{request.requestedBy || '—'}</td>
                   <td className="px-4 py-3 text-xs text-neutral-600">{formatLastSeen(request.requestedAt)}</td>
-                  <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${request.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{request.status === 'pending' ? 'بانتظار الإدارة' : 'تم تجهيزها من الإدارة'}</span></td>
-                  <td className="px-4 py-3"><button type="button" onClick={() => navigate('/orders')} className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50">فتح الطلبات <ArrowUpRight size={14} /></button></td>
+                  <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${request.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{request.status === 'pending' ? 'مجهز من التاجر — بانتظار الإشعار' : 'تمت المعالجة من الإدارة'}</span></td>
+                  <td className="px-4 py-3">{request.status === 'pending' ? <button type="button" onClick={() => notifyPreparedShipment(request)} disabled={Boolean(processingShipmentRequestId)} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">
+                    {processingShipmentRequestId === request.id ? <LoaderCircle size={14} className="animate-spin" /> : <><BellRing size={14} /><MessageCircle size={14} /></>}
+                    {processingShipmentRequestId === request.id ? 'جارٍ التنفيذ...' : 'إشعار + WhatsApp'}
+                  </button> : <span className="text-xs font-semibold text-emerald-700">تمت المعالجة</span>}</td>
                 </tr>)}
               </tbody>
             </table>
