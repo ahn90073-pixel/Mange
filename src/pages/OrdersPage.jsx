@@ -164,8 +164,8 @@ function OrderDetails({ order, onClose, onUpdated }) {
         </header>
 
         <div className="overflow-y-auto p-5 sm:p-7">
-          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-            هذه لوحة عامة بلا تسجيل دخول؛ بيانات العملاء والطلبات مرئية لكل من يصل إليها. توجيه الطلب للتاجر يتم يدويًا بعد نسخ الملخص.
+          <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
+            يمكن فتح WhatsApp برسالة شحن جاهزة للمراجعة؛ لن تُرسل الرسالة إلا بعد مراجعتها والضغط على الإرسال يدويًا.
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
