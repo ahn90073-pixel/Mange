@@ -13,6 +13,8 @@ import {
   XCircle,
   Pencil,
   ImagePlus,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react'
 import { useDashboard } from '../context/DashboardContext'
 import { formatCurrency, formatDate } from '../utils/format'
@@ -53,17 +55,19 @@ function editValues(product) {
   }
 }
 
-export default function PendingProductsPage() {
-  const { products, approveProduct, rejectProduct, updateProduct } = useDashboard()
+export default function PendingProductsPage({ vendorId = null, embedded = false }) {
+  const { products, approveProduct, rejectProduct, updateProduct, deleteActiveProduct, resubmitProduct } = useDashboard()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('pending')
+  const [statusFilter, setStatusFilter] = useState(embedded ? 'all' : 'pending')
   const [rejectModal, setRejectModal] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [editModal, setEditModal] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [busyProductId, setBusyProductId] = useState(null)
+  const [archiveModal, setArchiveModal] = useState(null)
 
-  const filtered = products.filter((p) => {
+  const scopedProducts = vendorId ? products.filter((product) => product.vendorId === vendorId) : products
+  const filtered = scopedProducts.filter((p) => {
     const query = search.trim().toLocaleLowerCase()
     const matchesSearch =
       String(p.name || '').toLocaleLowerCase().includes(query) ||
@@ -73,9 +77,9 @@ export default function PendingProductsPage() {
     return matchesSearch && matchesStatus
   })
 
-  const pendingCount = products.filter((p) => p.status === 'pending').length
-  const approvedCount = products.filter((p) => p.status === 'approved').length
-  const rejectedCount = products.filter((p) => p.status === 'rejected').length
+  const pendingCount = scopedProducts.filter((p) => p.status === 'pending').length
+  const approvedCount = scopedProducts.filter((p) => p.status === 'approved').length
+  const rejectedCount = scopedProducts.filter((p) => p.status === 'rejected').length
 
   const handleApprove = async (product) => {
     setBusyProductId(product.id)
@@ -127,9 +131,25 @@ export default function PendingProductsPage() {
     }
   }
 
+  const handleArchive = async () => {
+    if (!archiveModal) return
+    setBusyProductId(archiveModal.id)
+    try {
+      const result = await deleteActiveProduct(archiveModal.id)
+      if (result) setArchiveModal(null)
+    } finally {
+      setBusyProductId(null)
+    }
+  }
+
+  const handleResubmit = async (product) => {
+    setBusyProductId(product.id)
+    try { await resubmitProduct(product.id) } finally { setBusyProductId(null) }
+  }
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-4">
+      {!embedded && <div className="grid grid-cols-3 gap-4">
         <div className="card p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-warning-50 flex items-center justify-center text-warning-600"><Package size={20} /></div>
           <div><p className="text-xl font-bold text-neutral-900">{pendingCount}</p><p className="text-xs text-neutral-500">بانتظار المراجعة</p></div>
@@ -142,8 +162,9 @@ export default function PendingProductsPage() {
           <div className="w-10 h-10 rounded-xl bg-danger-50 flex items-center justify-center text-danger-600"><XCircle size={20} /></div>
           <div><p className="text-xl font-bold text-neutral-900">{rejectedCount}</p><p className="text-xs text-neutral-500">مرفوض</p></div>
         </div>
-      </div>
+      </div>}
 
+      {embedded && <div><h3 className="text-base font-bold text-neutral-900">منتجات التاجر</h3><p className="mt-1 text-sm text-neutral-500">جميع المنتجات المنشورة وتحت المراجعة والمرفوضة.</p></div>}
       <div className="card p-4 flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -186,9 +207,12 @@ export default function PendingProductsPage() {
               <p className="text-xs text-neutral-600 line-clamp-2 mb-4">{product.description}</p>
               <div className="flex items-center justify-between mt-auto"><p className="text-lg font-bold text-primary-600">{formatCurrency(product.price)}</p></div>
 
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button onClick={() => openEditor(product)} disabled={busyProductId === product.id} className="btn-secondary flex items-center justify-center gap-1 disabled:opacity-60" title="تعديل بيانات المنتج"><Pencil size={15} />تعديل</button>
+                <button onClick={() => setArchiveModal(product)} disabled={busyProductId === product.id} className="btn-danger flex items-center justify-center gap-1 disabled:opacity-60" title="أرشفة المنتج"><Trash2 size={15} />حذف</button>
+              </div>
               {product.status === 'pending' && (
-                <div className="grid grid-cols-3 gap-2 mt-4">
-                  <button onClick={() => openEditor(product)} disabled={busyProductId === product.id} className="btn-secondary flex items-center justify-center gap-1 disabled:opacity-60" title="تعديل بيانات المنتج"><Pencil size={15} />تعديل</button>
+                <div className="grid grid-cols-2 gap-2 mt-2">
                   <button onClick={() => handleApprove(product)} disabled={busyProductId === product.id} className="btn-success flex items-center justify-center gap-1 disabled:cursor-wait disabled:opacity-60"><Check size={15} />موافقة</button>
                   <button onClick={() => { setRejectModal(product); setRejectReason('') }} disabled={busyProductId === product.id} className="btn-danger flex items-center justify-center gap-1"><X size={15} />رفض</button>
                 </div>
@@ -196,6 +220,7 @@ export default function PendingProductsPage() {
               {product.status === 'rejected' && product.rejectReason && (
                 <div className="mt-4 p-3 rounded-xl bg-danger-50 text-xs text-danger-700 flex items-start gap-2"><FileText size={14} className="flex-shrink-0 mt-0.5" /><p>سبب الرفض: {product.rejectReason}</p></div>
               )}
+              {['approved', 'rejected'].includes(product.status) && <button onClick={() => handleResubmit(product)} disabled={busyProductId === product.id} className="btn-primary mt-2 flex w-full items-center justify-center gap-1 disabled:opacity-60"><RotateCcw size={15} />إعادة الرفع للمراجعة</button>}
               {product.status === 'approved' && (
                 <div className="mt-4 p-3 rounded-xl bg-success-50 text-xs text-success-700 flex items-center gap-2"><CheckCircle2 size={14} /><p>تم نشر المنتج في متجر التاجر</p></div>
               )}
@@ -206,7 +231,7 @@ export default function PendingProductsPage() {
 
       {filtered.length === 0 && <div className="flex flex-col items-center justify-center py-16 text-neutral-400"><Package size={48} className="mb-3" /><p className="text-sm">لا توجد منتجات مطابقة</p></div>}
 
-      <Modal open={!!editModal} onClose={() => { setEditModal(null); setEditForm(null) }} title="تعديل بيانات المنتج قبل الموافقة" maxWidth="max-w-4xl">
+      <Modal open={!!editModal} onClose={() => { setEditModal(null); setEditForm(null) }} title="تعديل بيانات المنتج" maxWidth="max-w-4xl">
         {editModal && editForm && (
           <form onSubmit={handleSaveEdit} className="space-y-5">
             <div className="flex flex-col sm:flex-row gap-4 items-start">
@@ -244,6 +269,10 @@ export default function PendingProductsPage() {
             </div>
           </form>
         )}
+      </Modal>
+
+      <Modal open={!!archiveModal} onClose={() => setArchiveModal(null)} title="تأكيد حذف المنتج">
+        {archiveModal && <div className="space-y-4"><p className="rounded-xl bg-danger-50 p-4 text-sm text-danger-800">سيتم أرشفة «{archiveModal.name}» وإزالته من العرض العام. هل تريد المتابعة؟</p><div className="flex justify-end gap-3"><button type="button" onClick={() => setArchiveModal(null)} className="btn-secondary">إلغاء</button><button type="button" onClick={handleArchive} disabled={busyProductId === archiveModal.id} className="btn-danger">{busyProductId === archiveModal.id ? 'جارٍ الحذف...' : 'تأكيد الحذف'}</button></div></div>}
       </Modal>
 
       <Modal open={!!rejectModal} onClose={() => setRejectModal(null)} title="رفض المنتج">

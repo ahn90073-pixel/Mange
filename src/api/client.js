@@ -169,6 +169,10 @@ export const adminApi = {
     `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}/review`,
     { method: 'PATCH', body: { decision, ...(reason ? { reason } : {}) } },
   ),
+  resubmitProduct: (vendorId, productId) => request(
+    `/products/${encodeURIComponent(vendorId)}/${encodeURIComponent(productId)}/resubmit`,
+    { method: 'PATCH', body: {} },
+  ),
   updateVendorStatus: (vendorId, status) => request(
     `/vendors/${encodeURIComponent(vendorId)}/status`,
     { method: 'PATCH', body: { status } },

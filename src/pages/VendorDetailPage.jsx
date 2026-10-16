@@ -26,6 +26,7 @@ import {
 import { vendorStatusMap } from '../data/mockData'
 import { generateVendorReportPDF } from '../utils/pdfGenerator'
 import { EGYPT_GOVERNORATES } from '../data/egyptGovernorates'
+import PendingProductsPage from './PendingProductsPage'
 
 export default function VendorDetailPage() {
   const { id } = useParams()
@@ -235,6 +236,10 @@ export default function VendorDetailPage() {
           </div>
         </div>
       </div>
+
+      <section className="card p-5 sm:p-6">
+        <PendingProductsPage vendorId={vendor.id} embedded />
+      </section>
 
       {/* Settlements history */}
       <div className="card p-6">

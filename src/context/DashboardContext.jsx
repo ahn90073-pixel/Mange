@@ -120,6 +120,18 @@ export function DashboardProvider({ children, user }) {
     )
   }, [findProduct, runMutation, showToast])
 
+  const resubmitProduct = useCallback((productId) => {
+    const product = findProduct(productId)
+    if (!product) {
+      showToast('error', 'تعذر العثور على المنتج المطلوب.')
+      return Promise.resolve(null)
+    }
+    return runMutation(
+      () => adminApi.resubmitProduct(product.vendorId, product.id),
+      'تمت إعادة رفع المنتج إلى قائمة المراجعة.'
+    )
+  }, [findProduct, runMutation, showToast])
+
   const updateProduct = useCallback((productId, updates) => {
     const product = findProduct(productId)
     if (!product) {
@@ -203,6 +215,7 @@ export function DashboardProvider({ children, user }) {
     hideToast,
     approveProduct,
     rejectProduct,
+    resubmitProduct,
     updateProduct,
     updateCommission,
     updateVendorStatus,
