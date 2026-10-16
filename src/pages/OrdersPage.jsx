@@ -4,6 +4,7 @@ import { adminApi } from '../api/client'
 import { orderStatusMap } from '../data/mockData'
 import { useDashboard } from '../context/DashboardContext'
 import { formatCurrency, formatDate } from '../utils/format'
+import { shipmentWhatsAppUrl } from '../utils/shipmentWhatsApp'
 
 const statusOptions = [
   ['pending', 'بانتظار التأكيد'],
@@ -26,18 +27,10 @@ const statusTransitions = {
   refunded: ['refunded'],
 }
 
-function internationalPhone(value) {
-  const arabicDigits = String(value || '').replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
-  let digits = arabicDigits.replace(/\D/g, '')
-  if (digits.startsWith('00')) digits = digits.slice(2)
-  if (digits.startsWith('0')) digits = `20${digits.slice(1)}`
-  return digits
-}
-
 const shipmentStatusOptions = [
   ['pending', 'بانتظار التجهيز'],
   ['label_created', 'تم إنشاء بوليصة'],
-  ['ready', 'جهزها التاجر للشحن'],
+  ['ready', 'مجهز للشحن'],
   ['picked_up', 'استلمتها شركة الشحن'],
   ['in_transit', 'في الطريق'],
   ['delivered', 'تم التسليم'],
@@ -54,32 +47,6 @@ const shipmentStatusStyles = {
   failed: 'bg-rose-100 text-rose-800',
   returned: 'bg-orange-100 text-orange-800',
 }
-const whatsappShipmentStatuses = new Set(['ready', 'picked_up', 'in_transit', 'delivered'])
-
-function shipmentWhatsAppUrl(order) {
-  const phone = internationalPhone(order.customer?.phone || order.customerPhone)
-  const shipmentStatus = order.shipment?.status || order.shipmentStatus || 'pending'
-  if (!phone || !whatsappShipmentStatuses.has(shipmentStatus)) return ''
-
-  const orderNumber = order.id || order.orderNumber || order.orderId || '—'
-  const customerName = typeof order.customer === 'string' ? order.customer : order.customer?.name
-  const vendorName = order.vendor?.name || order.vendorName || 'المتجر'
-  const carrier = order.shipment?.carrier || order.carrier || ''
-  const trackingNumber = order.shipment?.trackingNumber || order.trackingNumber || ''
-  const shipmentMessage = shipmentStatus === 'ready'
-    ? `تم تجهيز طرد طلبك رقم ${orderNumber} للشحن من ${vendorName}.`
-    : shipmentStatus === 'delivered'
-      ? `تم تسجيل تسليم طلبك رقم ${orderNumber} من ${vendorName}.`
-      : `تم شحن طرد طلبك رقم ${orderNumber} من ${vendorName}.`
-  const message = [
-    customerName ? `مرحبًا ${customerName}،` : 'مرحبًا،',
-    shipmentMessage,
-    carrier ? `شركة الشحن: ${carrier}` : '',
-    trackingNumber ? `رقم التتبع: ${trackingNumber}` : '',
-  ].filter(Boolean).join('\n')
-  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-}
-
 function Field({ label, children }) {
   return <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">{label}</span>{children}</label>
 }
@@ -303,7 +270,7 @@ export default function OrdersPage() {
         <select className="input sm:max-w-56" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="all">جميع الحالات</option>{statusOptions.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select aria-label="تصفية حسب حالة الشحنة" className="input sm:max-w-56" value={shipmentStatusFilter} onChange={(event) => { setPage(1); setShipmentStatusFilter(event.target.value) }}><option value="all">كل حالات الشحنة</option>{shipmentStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
       </div>
-      {shipmentStatusFilter === 'ready' && <p className="-mt-3 text-xs leading-5 text-neutral-500">يعرض هذا الاختيار الطرود التي أكد التاجر تجهيزها. زر WhatsApp يفتح رسالة جاهزة للمراجعة ولا يرسلها تلقائيًا.</p>}
+      {shipmentStatusFilter === 'ready' && <p className="-mt-3 text-xs leading-5 text-neutral-500">يعرض هذا الاختيار الطرود التي اعتمدت الإدارة تجهيزها. رسالة WhatsApp الجاهزة تحتاج مراجعة وإرسالًا يدويًا.</p>}
 
       <section className="card overflow-hidden">
         {loading ? <div className="flex items-center justify-center gap-3 p-12 text-sm text-neutral-500"><LoaderCircle size={18} className="animate-spin text-primary-600" />جارٍ تحميل الطلبات...</div> : orders.length === 0 ? <div className="p-12 text-center"><ShoppingBag size={34} className="mx-auto text-neutral-300" /><p className="mt-3 font-semibold text-neutral-700">لا توجد طلبات مطابقة</p><p className="mt-1 text-sm text-neutral-500">ستظهر طلبات المتجر الجديدة هنا بعد إتمام الشراء.</p></div> : (
