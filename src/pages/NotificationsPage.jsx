@@ -45,13 +45,14 @@ export default function NotificationsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    if (audience === 'customer') setContacts([])
     try {
       const [nextStatus, nextContacts] = await Promise.all([
         adminApi.notificationStatus(),
-        adminApi.notificationContacts(audience, 1, 50),
+        audience === 'merchant' ? adminApi.notificationContacts('merchant', 1, 50) : Promise.resolve(null),
       ])
       setStatus(nextStatus)
-      setContacts(nextContacts?.items || [])
+      setContacts(audience === 'merchant' ? nextContacts?.items || [] : [])
     } catch (error) {
       showToast('error', error.message || 'تعذر تحميل مركز الإشعارات.')
     } finally {
@@ -183,11 +184,11 @@ export default function NotificationsPage() {
         {result && <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">نتيجة الإرسال: <b>{result.sent}</b> ناجح، <b>{result.failed}</b> فاشل، من أصل <b>{result.total}</b> مستلم.</div>}
       </section>
 
-      <section className="card overflow-hidden">
+      {audience === 'merchant' && <section className="card overflow-hidden">
         <div className="border-b border-neutral-100 px-5 py-4">
-          <h3 className="font-bold text-neutral-900">{audience === 'merchant' ? 'جدول توكنات التجار' : 'جدول توكنات الجمهور'}</h3>
+          <h3 className="font-bold text-neutral-900">جدول توكنات التجار</h3>
           <p className="mt-1 text-xs text-neutral-500">
-            {audience === 'merchant' ? 'اسم التاجر والشركة والموقع التقريبي من اتصال IP.' : 'يظهر رقم الهاتف وبيانات الجهاز والموقع التقريبي للعميل.'} لا تعرض القائمة التوكن كاملًا.
+            اسم التاجر والشركة والموقع التقريبي من اتصال IP. لا تعرض القائمة التوكن كاملًا.
           </p>
         </div>
         {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ التحميل...</div> : contacts.length === 0 ? <p className="p-8 text-center text-sm text-neutral-500">لا توجد أجهزة مطابقة.</p> : (
@@ -195,8 +196,8 @@ export default function NotificationsPage() {
             <table className="w-full min-w-[1100px] text-right text-sm">
               <thead className="bg-neutral-50 text-xs text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3">{audience === 'merchant' ? 'اسم التاجر' : 'بيانات العميل'}</th>
-                  {audience === 'merchant' && <th className="px-4 py-3">اسم الشركة</th>}
+                  <th className="px-4 py-3">اسم التاجر</th>
+                  <th className="px-4 py-3">اسم الشركة</th>
                   <th className="px-4 py-3">الهاتف</th>
                   <th className="px-4 py-3">الموقع التقريبي</th>
                   <th className="px-4 py-3">المنصة / الإصدار</th>
@@ -208,8 +209,8 @@ export default function NotificationsPage() {
               <tbody className="divide-y divide-neutral-100">
                 {contacts.map((contact, index) => (
                   <tr key={`${contact.companyId}-${contact.whatsappPhone}-${index}`} className="table-row-hover">
-                    <td className="px-4 py-3"><p className="font-semibold">{contact.name}</p>{audience === 'customer' && <p className="mt-1 text-xs text-neutral-500">جهاز مسجل</p>}</td>
-                    {audience === 'merchant' && <td className="px-4 py-3">{contact.companyName || contact.storeName || '—'}</td>}
+                    <td className="px-4 py-3"><p className="font-semibold">{contact.name}</p></td>
+                    <td className="px-4 py-3">{contact.companyName || contact.storeName || '—'}</td>
                     <td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td>
                     <td className="px-4 py-3 text-xs text-neutral-600">{formatApproxLocation(contact)}</td>
                     <td className="px-4 py-3">{contact.platform} / {contact.appVersion}</td>
@@ -222,7 +223,7 @@ export default function NotificationsPage() {
             </table>
           </div>
         )}
-      </section>
+      </section>}
     </div>
   )
 }

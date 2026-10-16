@@ -119,7 +119,22 @@ function OrderDetails({ order, onClose, onUpdated }) {
         shipmentStatus,
         shippingFee: Number(shippingFee),
       })
-      showToast('success', 'تم حفظ حالة الطلب وبيانات الشحن.')
+      const notification = updated.notification
+      if (notification?.status === 'sent') {
+        showToast('success', `تم حفظ الشحنة وإرسال إشعار Push إلى ${notification.sent} جهاز.`)
+      } else if (notification?.status === 'completed_with_failures') {
+        showToast('error', `تم حفظ الشحنة، لكن نجح إرسال ${notification.sent} وفشل ${notification.failed} من الإشعارات.`)
+      } else if (notification?.status === 'no_tokens') {
+        showToast('error', 'تم حفظ الشحنة، لكن لا يوجد جهاز عميل مسجل ومفعّل لاستقبال Push.')
+      } else if (notification?.status === 'not_configured') {
+        showToast('error', 'تم حفظ الشحنة، لكن خدمة إشعارات العملاء غير مهيأة.')
+      } else if (notification?.status === 'no_customer_phone') {
+        showToast('error', 'تم حفظ الشحنة، لكن رقم هاتف العميل غير متاح لإرسال الإشعار.')
+      } else if (notification?.status === 'failed') {
+        showToast('error', 'تم حفظ الشحنة، لكن تعذر إرسال إشعار Push.')
+      } else {
+        showToast('success', 'تم حفظ حالة الطلب وبيانات الشحن.')
+      }
       onUpdated(updated)
     } catch (error) {
       showToast('error', error.message || 'تعذر تحديث الطلب.')
@@ -218,7 +233,7 @@ function OrderDetails({ order, onClose, onUpdated }) {
               <Field label="حالة الشحنة"><select className="input" value={shipmentStatus} onChange={(event) => setShipmentStatus(event.target.value)}>{[['pending','بانتظار التجهيز'],['label_created','تم إنشاء بوليصة'],['ready','تم تجهيز الطرد'],['picked_up','استلمتها شركة الشحن'],['in_transit','في الطريق'],['delivered','تم التسليم'],['failed','تعذر التسليم'],['returned','مرتجع']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label={`رسوم الشحن (${order.totals.currency})`}><input className="input" type="number" min="0" step="0.01" value={shippingFee} onChange={(event) => setShippingFee(event.target.value)} /></Field>
             </div>
-            <p className="mt-3 text-xs leading-5 text-neutral-500">لا يوجد اتصال آلي بشركة شحن في الوقت الحالي؛ تُدخل بياناتها ورقم التتبع بعد التواصل معها خارج النظام.</p>
+            <p className="mt-3 text-xs leading-5 text-neutral-500">تجهيز الطرد من الإدارة. عند حفظ حالة «تم تجهيز الطرد» يرسل خادم الإدارة إشعار Push إلى العميل إذا كان جهازه مسجلًا ومفعّلًا. لا يوجد اتصال آلي بشركة الشحن؛ تُدخل بياناتها ورقم التتبع يدويًا.</p>
             <button type="button" onClick={save} disabled={saving} className="btn-primary mt-4 w-full sm:w-auto disabled:cursor-wait disabled:opacity-60">{saving ? <LoaderCircle size={16} className="animate-spin" /> : <Truck size={16} />}{saving ? 'جارٍ الحفظ...' : 'حفظ التوجيه والتحديث'}</button>
           </section>
         </div>
