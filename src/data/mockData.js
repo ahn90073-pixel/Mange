@@ -1,7 +1,7 @@
 // Display labels for values returned by the Mange administration API.
 export const vendorStatusMap = {
   active: { label: 'نشط', class: 'badge-success' },
-  suspended: { label: 'موقوف', class: 'badge-danger' },
+  suspended: { label: 'مؤرشف / موقوف', class: 'badge-danger' },
   pending_approval: { label: 'بانتظار الموافقة', class: 'badge-warning' },
 }
 

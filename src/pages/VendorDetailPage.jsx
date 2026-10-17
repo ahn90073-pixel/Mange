@@ -11,7 +11,6 @@ import {
   DollarSign,
   Percent,
   FileText,
-  Ban,
   CheckCircle,
   Receipt,
 } from 'lucide-react'
@@ -27,6 +26,7 @@ import { vendorStatusMap } from '../data/mockData'
 import { generateVendorReportPDF } from '../utils/pdfGenerator'
 import { EGYPT_GOVERNORATES } from '../data/egyptGovernorates'
 import PendingProductsPage from './PendingProductsPage'
+import VendorArchiveAction from '../components/vendors/VendorArchiveAction'
 
 export default function VendorDetailPage() {
   const { id } = useParams()
@@ -121,22 +121,12 @@ export default function VendorDetailPage() {
                 <FileText size={16} />
                 تحميل التقرير PDF
               </button>
-              {vendor.status === 'active' ? (
-                <button
-                  onClick={() => updateVendorStatus(vendor.id, 'suspended')}
-                  className="btn bg-danger-500/90 text-white hover:bg-danger-600"
-                >
-                  <Ban size={16} />
-                  إيقاف الحساب
-                </button>
-              ) : (
-                <button
-                  onClick={() => updateVendorStatus(vendor.id, 'active')}
-                  className="btn bg-success-500/90 text-white hover:bg-success-600"
-                >
-                  <CheckCircle size={16} />
-                  تفعيل الحساب
-                </button>
+              {isSuperAdmin && (
+                <VendorArchiveAction
+                  vendor={vendor}
+                  updateVendorStatus={updateVendorStatus}
+                  variant="header"
+                />
               )}
             </div>
           </div>
