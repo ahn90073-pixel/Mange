@@ -154,7 +154,9 @@ export function DashboardProvider({ children, user }) {
   const updateVendorStatus = useCallback((vendorId, status) => (
     runMutation(
       () => adminApi.updateVendorStatus(vendorId, status),
-      'تم تحديث حالة التاجر.'
+      status === 'suspended'
+        ? 'تمت أرشفة المتجر وإيقافه مع الاحتفاظ بجميع بياناته.'
+        : 'تمت إعادة تفعيل المتجر.'
     )
   ), [runMutation])
 

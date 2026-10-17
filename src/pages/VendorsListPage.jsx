@@ -17,9 +17,11 @@ import {
   calculateNetBalance,
 } from '../utils/format'
 import { vendorStatusMap } from '../data/mockData'
+import VendorArchiveAction from '../components/vendors/VendorArchiveAction'
 
 export default function VendorsListPage() {
-  const { vendors, user } = useDashboard()
+  const { vendors, user, updateVendorStatus } = useDashboard()
+  const isSuperAdmin = user?.role === 'super_admin'
   const hasFullAccess = user?.role === 'super_admin' || user?.role === 'employee'
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -169,13 +171,18 @@ export default function VendorsListPage() {
                     </td>
                     </> : <td className="px-5 py-4 font-semibold text-neutral-800">{formatNumber(vendor.totalOrders)} طلب</td>}
                     <td className="px-5 py-4 text-center">
-                      <Link
-                        to={`/vendors/${vendor.id}`}
-                        className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
-                        title="عرض التفاصيل"
-                      >
-                        <Eye size={18} />
-                      </Link>
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <Link
+                          to={`/vendors/${vendor.id}`}
+                          className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
+                          title="عرض التفاصيل"
+                        >
+                          <Eye size={18} />
+                        </Link>
+                        {isSuperAdmin && (
+                          <VendorArchiveAction vendor={vendor} updateVendorStatus={updateVendorStatus} />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
