@@ -34,10 +34,10 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="إجمالي المبيعات" value={formatCurrency(totalSales)} icon={DollarSign} color="primary" trend={12} trendLabel="ضمن نطاق الصلاحية" />
-        <StatCard title="عمولة المنصة" value={formatCurrency(totalCommission)} icon={TrendingUp} color="success" trend={8} trendLabel="إجمالي العمولات المقتطعة" />
-        <StatCard title="التجار النشطون" value={`${activeVendors} / ${vendors.length}`} icon={Store} color="warning" trendLabel="تجار ضمن نطاق الصلاحية" />
-        <StatCard title="منتجات بانتظار المراجعة" value={formatNumber(pendingCount)} icon={PackageCheck} color="danger" trendLabel="تحتاج إجراء فوري" />
+        <StatCard title="إجمالي المبيعات" value={formatCurrency(totalSales)} icon={DollarSign} color="primary" />
+        <StatCard title="عمولة المنصة" value={formatCurrency(totalCommission)} icon={TrendingUp} color="success" />
+        <StatCard title="التجار النشطون" value={`${activeVendors} / ${vendors.length}`} icon={Store} color="warning" />
+        <StatCard title="منتجات بانتظار المراجعة" value={formatNumber(pendingCount)} icon={PackageCheck} color="danger" />
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -97,7 +97,7 @@ export default function DashboardPage() {
       </div>
 
       {hasFullAccess && pendingCount > 0 && <Link to="/pending-products" className="block rounded-2xl border border-warning-100 bg-warning-50/50 p-5 transition-shadow hover:shadow-card-hover">
-        <div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning-500 text-white"><PackageCheck size={24} /></div><div className="flex-1"><p className="font-bold text-neutral-900">{pendingCount} منتج بانتظار المراجعة</p><p className="text-sm text-neutral-600">يرجى مراجعة المنتجات الجديدة المرفوعة من التجار</p></div><ArrowLeft className="text-warning-600" size={20} /></div>
+        <div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning-500 text-white"><PackageCheck size={24} /></div><div className="flex-1"><p className="font-bold text-neutral-900">{pendingCount} منتج بانتظار المراجعة</p></div><ArrowLeft className="text-warning-600" size={20} /></div>
       </Link>}
     </div>
   )

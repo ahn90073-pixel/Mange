@@ -130,3 +130,71 @@
 .modal-overlay {
   animation: fadeIn 0.2s ease-out;
 }
+
+.app-splash {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #102b4a 0%, #183e66 52%, #0b1e34 100%);
+  color: #fff;
+}
+
+.app-splash::before,
+.app-splash::after {
+  position: absolute;
+  width: min(76vw, 30rem);
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(82 166 255 / 20%), rgb(82 166 255 / 0%) 70%);
+  content: '';
+  pointer-events: none;
+}
+
+.app-splash::before {
+  top: -30%;
+  right: -24%;
+}
+
+.app-splash::after {
+  bottom: -36%;
+  left: -26%;
+  background: radial-gradient(circle, rgb(48 115 196 / 22%), rgb(48 115 196 / 0%) 70%);
+}
+
+.app-splash-brand {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  animation: splashBrandIn 0.75s ease-out both;
+}
+
+.app-splash-mark {
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 1.4rem;
+  background: rgb(255 255 255 / 12%);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 18%);
+  color: #fff;
+  backdrop-filter: blur(10px);
+}
+
+.app-splash-name {
+  font-family: 'Cairo', 'Tajawal', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+}
+
+@keyframes splashBrandIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

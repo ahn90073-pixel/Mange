@@ -14,12 +14,18 @@ export default function EmployeesPage() {
   const [saving, setSaving] = useState(false)
 
   const loadEmployees = useCallback(async () => {
-    setLoading(true)
+    const cached = await adminApi.cache.employees()
+    if (cached !== undefined) {
+      setEmployees(cached?.items || [])
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     try {
       const result = await adminApi.employees()
       setEmployees(result?.items || [])
     } catch (error) {
-      showToast('error', error.message || 'تعذر تحميل الموظفين.')
+      if (cached === undefined) showToast('error', error.message || 'تعذر تحميل الموظفين.')
     } finally {
       setLoading(false)
     }
@@ -63,17 +69,17 @@ export default function EmployeesPage() {
 
   return (
     <div dir="rtl" className="space-y-6">
-      <div><h2 className="text-xl font-bold text-neutral-900">إدارة الموظفين</h2><p className="mt-1 text-sm text-neutral-500">أنشئ حسابًا وحدد المحافظات التي يسمح للموظف بالوصول إليها.</p></div>
+      <div><h2 className="text-xl font-bold text-neutral-900">إدارة الموظفين</h2></div>
 
       <form onSubmit={createEmployee} className="card space-y-5 p-5 sm:p-7">
-        <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-700"><UserPlus size={21} /></div><div><h3 className="font-bold text-neutral-900">إضافة موظف جديد</h3><p className="mt-1 text-xs text-neutral-500">كلمة المرور لا تقل عن 12 حرفًا.</p></div></div>
+        <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-700"><UserPlus size={21} /></div><h3 className="font-bold text-neutral-900">إضافة موظف جديد</h3></div>
         <div className="grid gap-4 md:grid-cols-3">
           <label className="space-y-1.5"><span className="text-sm font-semibold text-neutral-700">الاسم</span><input className="input" required minLength={2} maxLength={160} value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} autoComplete="name" /></label>
           <label className="space-y-1.5"><span className="text-sm font-semibold text-neutral-700">البريد الإلكتروني</span><input className="input" type="email" required maxLength={254} dir="ltr" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} autoComplete="email" /></label>
           <label className="space-y-1.5"><span className="text-sm font-semibold text-neutral-700">كلمة المرور المؤقتة</span><input className="input" type="password" required minLength={12} maxLength={1024} dir="ltr" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="new-password" /></label>
         </div>
         <fieldset>
-          <legend className="mb-2 text-sm font-semibold text-neutral-700">المحافظات المسموح بها <span className="font-normal text-neutral-500">(اختر واحدة على الأقل)</span></legend>
+          <legend className="mb-2 text-sm font-semibold text-neutral-700">المحافظات المسموح بها</legend>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {EGYPT_GOVERNORATES.map((governorate) => {
               const checked = form.assignedGovernorates.includes(governorate)
@@ -89,7 +95,7 @@ export default function EmployeesPage() {
       </form>
 
       <section className="card overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-neutral-100 px-5 py-4"><Users className="text-primary-600" size={20} /><div><h3 className="font-bold text-neutral-900">حسابات الموظفين</h3><p className="mt-1 text-xs text-neutral-500">تغيير الحالة يعطّل الجلسات القائمة فورًا.</p></div></div>
+        <div className="flex items-center gap-3 border-b border-neutral-100 px-5 py-4"><Users className="text-primary-600" size={20} /><h3 className="font-bold text-neutral-900">حسابات الموظفين</h3></div>
         {loading ? <div className="flex items-center justify-center gap-2 py-12 text-sm text-neutral-500"><LoaderCircle className="animate-spin" size={18} />جارٍ التحميل...</div> : employees.length === 0 ? <p className="py-12 text-center text-sm text-neutral-500">لا يوجد موظفون حتى الآن.</p> : (
           <div className="divide-y divide-neutral-100">
             {employees.map((employee) => <article key={employee.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

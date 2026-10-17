@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BellRing, Image, LoaderCircle, MessageCircle, PackageCheck, RefreshCw, Send, Users, X } from 'lucide-react'
+import { BellRing, Image, LoaderCircle, MessageCircle, PackageCheck, RefreshCw, Send, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { adminApi } from '../api/client'
 import { useDashboard } from '../context/DashboardContext'
@@ -46,8 +46,16 @@ export default function NotificationsPage() {
   const [processingShipmentRequestId, setProcessingShipmentRequestId] = useState('')
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setContacts([])
+    const [cachedStatus, cachedContacts, cachedShipments] = await Promise.all([
+      adminApi.cache.notificationStatus(),
+      adminApi.cache.notificationContacts(audience, 1, 100),
+      adminApi.cache.shipmentActivationRequests('all', 50),
+    ])
+    const hasCompleteCache = cachedStatus !== undefined && cachedContacts !== undefined && cachedShipments !== undefined
+    setStatus(cachedStatus ?? null)
+    setContacts(cachedContacts?.items || [])
+    setShipmentRequests(cachedShipments?.items || [])
+    setLoading(!hasCompleteCache)
     try {
       const [nextStatus, nextContacts, nextShipmentRequests] = await Promise.all([
         adminApi.notificationStatus(),
@@ -58,7 +66,7 @@ export default function NotificationsPage() {
       setContacts(nextContacts?.items || [])
       setShipmentRequests(nextShipmentRequests?.items || [])
     } catch (error) {
-      showToast('error', error.message || 'تعذر تحميل مركز الإشعارات.')
+      if (!hasCompleteCache) showToast('error', error.message || 'تعذر تحميل مركز الإشعارات.')
     } finally {
       setLoading(false)
     }
@@ -69,7 +77,6 @@ export default function NotificationsPage() {
   const audienceStats = status?.audiences?.[audience] || { readyToSend: 0, optedIn: 0, total: 0 }
   const customerCities = audience === 'customer' && Array.isArray(status?.customerCities) ? status.customerCities : []
   const configured = Boolean(status?.configured?.[audience])
-  const requiredSecret = audience === 'customer' ? 'FCM_PUBLIC_SERVICE_ACCOUNT_JSON' : 'FCM_SERVICE_ACCOUNT_JSON'
   const selectedStore = useMemo(() => vendors.find((vendor) => vendor.id === companyId), [companyId, vendors])
 
   useEffect(() => {
@@ -111,7 +118,7 @@ export default function NotificationsPage() {
       let whatsappSummary = ''
       if (whatsappUrl && whatsappWindow) {
         whatsappWindow.location.href = whatsappUrl
-        whatsappSummary = 'فُتحت مسودة WhatsApp للمراجعة؛ اضغط إرسال يدويًا بعد مراجعتها.'
+        whatsappSummary = 'مسودة WhatsApp جاهزة.'
       } else {
         if (whatsappWindow) whatsappWindow.close()
         whatsappSummary = whatsappUrl
@@ -184,14 +191,13 @@ export default function NotificationsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-neutral-900">مركز الإشعارات</h2>
-          <p className="mt-1 text-sm text-neutral-500">حملات FCM للعملاء أو التجار المسجلين مع تفعيل الإشعارات.</p>
         </div>
         <button type="button" onClick={load} disabled={loading} className="btn-secondary"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} />تحديث</button>
       </div>
 
       {!configured && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-          <strong>الإرسال متوقف لجمهور {audienceLabels[audience]}:</strong> يجب إعداد السر <code dir="ltr">{requiredSecret}</code> بحساب Firebase الخاص بالتطبيق في بيئة الخادم.
+          <strong>إرسال إشعارات {audienceLabels[audience]} غير مفعّل.</strong>
         </div>
       )}
 
@@ -207,15 +213,14 @@ export default function NotificationsPage() {
           </div>
           <p className="mt-1 text-xs text-neutral-500">المفعّل منهم: {audienceStats.optedIn}</p>
         </section>
-        <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p><p className="mt-1 text-xs text-neutral-500">الحد الأقصى للحملة: 500 رمز</p></section>
-        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? (targetTokenRef ? (contacts.find((contact) => contact.tokenRef === targetTokenRef)?.name || 'عميل محدد') : 'كل العملاء') : (selectedStore?.companyName || 'كل التجار')}</p><p className="mt-1 text-xs text-neutral-500">{audience === 'customer' ? (targetTokenRef ? 'جهاز العميل المحدد فقط' : 'أجهزة العملاء المسجلة') : (companyId ? 'تاجر محدد' : 'كل التجار')}</p></section>
+        <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p></section>
+        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? (targetTokenRef ? (contacts.find((contact) => contact.tokenRef === targetTokenRef)?.name || 'عميل محدد') : 'كل العملاء') : (selectedStore?.companyName || 'كل التجار')}</p></section>
       </div>
 
       <section className="card overflow-hidden">
         <div className="flex flex-col gap-2 border-b border-neutral-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="flex items-center gap-2 font-bold text-neutral-900"><PackageCheck size={18} className="text-primary-600" />طرود جهزها التجار — بانتظار إشعار العميل</h3>
-            <p className="mt-1 text-xs text-neutral-500">بعد ضغط التاجر «تم التجهيز»، يظهر الطلب هنا. الزر يرسل Push ويفتح مسودة WhatsApp؛ إرسال WhatsApp النهائي يدوي بعد المراجعة.</p>
           </div>
           <span className="w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">بانتظار الإشعار: {shipmentRequests.filter((request) => request.status === 'pending').length}</span>
         </div>
@@ -254,19 +259,18 @@ export default function NotificationsPage() {
               <button type="button" aria-pressed={audience === 'merchant'} onClick={() => { setAudience('merchant'); setTargetTokenRef('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'merchant' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات التجار</button>
             </div>
             {audience === 'merchant' && <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">التاجر (اختياري)</span><select className="input" value={companyId} onChange={(event) => setCompanyId(event.target.value)}><option value="">كل التجار</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName || vendor.name || vendor.id}</option>)}</select></label>}
-            {audience === 'customer' && <div className="space-y-2 sm:col-span-2"><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">عميل محدد (اختياري)</span><select className="input" value={targetTokenRef} onChange={(event) => setTargetTokenRef(event.target.value)}><option value="">كل العملاء</option>{contacts.filter((contact) => contact.tokenRef).map((contact, index) => <option key={`${contact.tokenRef}-${index}`} value={contact.tokenRef}>{contact.name} — {contact.locationCity || 'مدينة غير محددة'} — {contact.whatsappPhone}</option>)}</select><span className="text-xs text-neutral-500">عند اختيار عميل، يُرسل الإشعار إلى الجهاز المحدد فقط.</span></label>{targetTokenRef && (() => { const selected = contacts.find((contact) => contact.tokenRef === targetTokenRef); return selected ? <div className="grid gap-2 rounded-xl border border-primary-100 bg-primary-50 p-3 text-sm sm:grid-cols-3"><p><span className="text-xs text-neutral-500">العميل</span><br /><b>{selected.name}</b></p><p><span className="text-xs text-neutral-500">المدينة</span><br /><b>{selected.locationCity || 'غير محددة'}</b><span className="block text-xs text-neutral-500">{[selected.locationRegion, selected.locationCountry].filter(Boolean).join('، ')}</span></p><p><span className="text-xs text-neutral-500">رقم واتساب</span><br /><bdi dir="ltr" className="font-medium">{selected.whatsappPhone}</bdi></p></div> : null })()}</div>}
+            {audience === 'customer' && <div className="space-y-2 sm:col-span-2"><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">عميل محدد (اختياري)</span><select className="input" value={targetTokenRef} onChange={(event) => setTargetTokenRef(event.target.value)}><option value="">كل العملاء</option>{contacts.filter((contact) => contact.tokenRef).map((contact, index) => <option key={`${contact.tokenRef}-${index}`} value={contact.tokenRef}>{contact.name} — {contact.locationCity || 'مدينة غير محددة'} — {contact.whatsappPhone}</option>)}</select></label>{targetTokenRef && (() => { const selected = contacts.find((contact) => contact.tokenRef === targetTokenRef); return selected ? <div className="grid gap-2 rounded-xl border border-primary-100 bg-primary-50 p-3 text-sm sm:grid-cols-3"><p><span className="text-xs text-neutral-500">العميل</span><br /><b>{selected.name}</b></p><p><span className="text-xs text-neutral-500">المدينة</span><br /><b>{selected.locationCity || 'غير محددة'}</b><span className="block text-xs text-neutral-500">{[selected.locationRegion, selected.locationCountry].filter(Boolean).join('، ')}</span></p><p><span className="text-xs text-neutral-500">رقم واتساب</span><br /><bdi dir="ltr" className="font-medium">{selected.whatsappPhone}</bdi></p></div> : null })()}</div>}
           </div>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">العنوان <span className="font-normal text-neutral-400">(120 حرفًا)</span></span><input required maxLength={120} className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="عنوان الإشعار" /></label>
-          <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">النص <span className="font-normal text-neutral-400">(500 حرف)</span></span><textarea required maxLength={500} rows={4} className="input resize-y" value={body} onChange={(event) => setBody(event.target.value)} placeholder="نص الرسالة التي ستظهر للمستلم" /></label>
+          <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">النص <span className="font-normal text-neutral-400">(500 حرف)</span></span><textarea required maxLength={500} rows={4} className="input resize-y" value={body} onChange={(event) => setBody(event.target.value)} /></label>
           <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><p className="flex items-center gap-2 text-sm font-bold text-neutral-800"><Image size={17} className="text-primary-600" />صورة الإشعار <span className="text-xs font-normal text-neutral-500">اختياري — حتى 1.5 ميجابايت</span></p><p className="mt-1 text-xs text-neutral-500">ستظهر الصورة في إشعار Firebase على الأجهزة التي تدعمها.</p></div>
+              <div><p className="flex items-center gap-2 text-sm font-bold text-neutral-800"><Image size={17} className="text-primary-600" />صورة الإشعار <span className="text-xs font-normal text-neutral-500">اختياري — حتى 1.5 ميجابايت</span></p></div>
               <label className="btn-secondary cursor-pointer"><Image size={16} />رفع صورة<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={handleImage} /></label>
             </div>
             {imagePreview && <div className="relative mt-3 w-fit"><img src={imagePreview} alt="معاينة صورة الإشعار" className="max-h-32 max-w-xs rounded-lg border border-neutral-200 object-cover" /><button type="button" onClick={clearImage} className="absolute -right-2 -top-2 rounded-full bg-rose-600 p-1 text-white shadow" aria-label="إزالة الصورة"><X size={14} /></button><p className="mt-1 max-w-xs truncate text-xs text-neutral-500">{imageName}</p></div>}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-5 text-neutral-500"><Users size={14} className="ml-1 inline" />{targetTokenRef ? 'سيصل الإشعار المخصص إلى الجهاز المحدد فقط. رقم واتساب للعرض والتواصل اليدوي، ولا يُرسل عبر واتساب تلقائيًا.' : 'سيصل الإشعار إلى من فعّل الإشعارات وسجّل رمز Push فقط. واتساب لا يرسل تلقائيًا.'}</p>
             <button type="submit" disabled={sending || loading || !configured || (targetTokenRef ? !contacts.some((contact) => contact.tokenRef === targetTokenRef && contact.pushEnabled && contact.hasPushToken) : audienceStats.readyToSend === 0) || !title.trim() || !body.trim()} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">{sending ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}{sending ? 'جارٍ الإرسال...' : 'إرسال الحملة'}</button>
           </div>
         </form>
@@ -276,9 +280,6 @@ export default function NotificationsPage() {
       <section className="card overflow-hidden">
         <div className="border-b border-neutral-100 px-5 py-4">
           <h3 className="font-bold text-neutral-900">جهات {audience === 'customer' ? 'الجمهور' : 'التجار'}</h3>
-          <p className="mt-1 text-xs text-neutral-500">
-            بيانات العميل والمدينة ورقم واتساب؛ لا يظهر التوكن أو أي جزء منه.
-          </p>
         </div>
         {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-neutral-500"><LoaderCircle size={17} className="animate-spin" />جارٍ التحميل...</div> : contacts.length === 0 ? <p className="p-8 text-center text-sm text-neutral-500">لا توجد أجهزة مطابقة.</p> : (
           <div className="overflow-x-auto">

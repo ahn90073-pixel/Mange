@@ -106,10 +106,6 @@ export default function ActiveProductsPage() {
             <h3 className="font-bold text-neutral-900 mb-1">
               منتجات مر عليها أكثر من شهر
             </h3>
-            <p className="text-sm text-neutral-600">
-              هذه قائمة بالمنتجات المنشورة لكل تاجر والتي مر على نشرها أكثر من 30 يوم.
-              يمكنك مراجعتها واتخاذ قرار إما بالإبقاء عليها للعرض أو حذفها من المتجر.
-            </p>
           </div>
           <div className="flex-shrink-0 text-left">
             <p className="text-2xl font-bold text-warning-600">{oldProducts.length}</p>
