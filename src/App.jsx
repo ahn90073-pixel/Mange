@@ -1,9 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
-import { LoaderCircle, RefreshCw } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
+import { LoaderCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 import Layout from './components/layout/Layout'
 import { DashboardProvider, useDashboard } from './context/DashboardContext'
 import { adminApi, getSessionToken, setSessionToken } from './api/client'
+import { initializeAdminCache, readCachedAdminUser, saveCachedAdminUser, setAdminCacheScope } from './lib/adminLocalCache'
 import { signInWithGoogle, signOutGoogle } from './lib/firebase'
 import LoginPage from './pages/LoginPage'
 import EmployeesPage from './pages/EmployeesPage'
@@ -32,15 +34,36 @@ function LoadingScreen({ label }) {
   )
 }
 
+function StartupSplash() {
+  return (
+    <main className="app-splash" dir="rtl" aria-label="Mange">
+      <div className="app-splash-brand">
+        <div className="app-splash-mark"><ShieldCheck size={30} strokeWidth={1.8} /></div>
+        <span className="app-splash-name">Mange</span>
+      </div>
+    </main>
+  )
+}
+
 function LoadFailure({ error, onRetry }) {
   return (
     <main dir="rtl" className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <section className="w-full max-w-lg rounded-2xl border border-neutral-200 bg-white p-7 text-center shadow-card">
         <h1 className="text-lg font-bold text-neutral-900">تعذر تحميل بيانات الإدارة</h1>
         <p role="alert" className="mt-3 text-sm leading-6 text-neutral-600">{error}</p>
-        <button type="button" onClick={onRetry} className="btn-primary mt-6">
-          <RefreshCw size={16} /> إعادة المحاولة
-        </button>
+        <button type="button" onClick={onRetry} className="btn-primary mt-6"><RefreshCw size={16} />إعادة المحاولة</button>
+      </section>
+    </main>
+  )
+}
+
+function SessionFailure({ error, onRetry }) {
+  return (
+    <main dir="rtl" className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+      <section className="w-full max-w-lg rounded-2xl border border-neutral-200 bg-white p-7 text-center shadow-card">
+        <h1 className="text-lg font-bold text-neutral-900">تعذر استعادة جلسة الإدارة</h1>
+        <p role="alert" className="mt-3 text-sm leading-6 text-neutral-600">{error}</p>
+        <button type="button" onClick={onRetry} className="btn-primary mt-6"><RefreshCw size={16} />إعادة المحاولة</button>
       </section>
     </main>
   )
@@ -66,11 +89,11 @@ function AppRoutes({ user, onLogout }) {
 
   let content
   if (!dataReady && loading) {
-    content = <LoadingScreen label="جارٍ تحميل بيانات لوحة الإدارة..." />
+    content = Capacitor.getPlatform() === 'android' ? <StartupSplash /> : <LoadingScreen label="جارٍ تحميل بيانات لوحة الإدارة..." />
   } else if (!dataReady && loadError) {
     content = <LoadFailure error={loadError} onRetry={refresh} />
   } else if (!dataReady) {
-    content = <LoadingScreen label="جارٍ تجهيز لوحة الإدارة..." />
+    content = Capacitor.getPlatform() === 'android' ? <StartupSplash /> : <LoadingScreen label="جارٍ تجهيز لوحة الإدارة..." />
   } else {
     content = (
       <Layout user={user} onLogout={onLogout}>
@@ -104,35 +127,72 @@ function AppRoutes({ user, onLogout }) {
 function AuthenticatedApp() {
   const [user, setUser] = useState(null)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [sessionError, setSessionError] = useState('')
+  const [restoreAttempt, setRestoreAttempt] = useState(0)
+  const isAndroid = Capacitor.getPlatform() === 'android'
+  const [splashElapsed, setSplashElapsed] = useState(!isAndroid)
+
+  useEffect(() => {
+    if (!isAndroid) return undefined
+    const timer = window.setTimeout(() => setSplashElapsed(true), 1600)
+    return () => window.clearTimeout(timer)
+  }, [isAndroid])
 
   useEffect(() => {
     let active = true
     const onExpired = () => {
       setSessionToken('')
+      setAdminCacheScope('')
       setUser(null)
+      setSessionError('')
       setCheckingSession(false)
     }
     window.addEventListener('mange:auth-expired', onExpired)
 
-    const token = getSessionToken()
-    if (!token) {
-      setCheckingSession(false)
-    } else {
-      adminApi.me()
-        .then((currentUser) => { if (active) setUser(currentUser) })
-        .catch(() => { if (active) setSessionToken('') })
-        .finally(() => { if (active) setCheckingSession(false) })
+    const restoreSession = async () => {
+      setCheckingSession(true)
+      setSessionError('')
+      try {
+        await initializeAdminCache()
+        if (!getSessionToken()) return
+
+        const cachedUser = await readCachedAdminUser()
+        if (cachedUser) {
+          setAdminCacheScope(cachedUser.id ?? cachedUser.uid ?? cachedUser.email)
+          if (active) setUser(cachedUser)
+          if (active) setCheckingSession(false)
+          void adminApi.me()
+            .then(async (currentUser) => {
+              await saveCachedAdminUser(currentUser)
+              if (active) setUser(currentUser)
+            })
+            .catch(() => {})
+          return
+        }
+
+        const currentUser = await adminApi.me()
+        await saveCachedAdminUser(currentUser)
+        if (active) setUser(currentUser)
+      } catch (error) {
+        if (active && getSessionToken()) setSessionError(error.message || 'تعذر الاتصال بخادم الإدارة.')
+      } finally {
+        if (active) setCheckingSession(false)
+      }
     }
+    void restoreSession()
+
     return () => {
       active = false
       window.removeEventListener('mange:auth-expired', onExpired)
     }
-  }, [])
+  }, [restoreAttempt])
 
   const login = useCallback(async (credentials) => {
     const session = await adminApi.login(credentials)
     setSessionToken(session.token)
+    await saveCachedAdminUser(session.user)
     setUser(session.user)
+    setSessionError('')
   }, [])
 
   const loginGoogle = useCallback(async () => {
@@ -140,7 +200,9 @@ function AuthenticatedApp() {
     try {
       const session = await adminApi.googleLogin(idToken)
       setSessionToken(session.token)
+      await saveCachedAdminUser(session.user)
       setUser(session.user)
+      setSessionError('')
     } catch (error) {
       await signOutGoogle().catch(() => {})
       throw error
@@ -151,10 +213,13 @@ function AuthenticatedApp() {
     try { await adminApi.logout() } catch { /* Expired sessions are cleared locally as well. */ }
     await signOutGoogle().catch(() => {})
     setSessionToken('')
+    setAdminCacheScope('')
     setUser(null)
+    setSessionError('')
   }, [])
 
-  if (checkingSession) return <LoadingScreen label="جارٍ التحقق من جلسة الدخول..." />
+  if (checkingSession || !splashElapsed) return isAndroid ? <StartupSplash /> : <LoadingScreen label="جارٍ التحقق من جلسة الدخول..." />
+  if (!user && sessionError) return <SessionFailure error={sessionError} onRetry={() => setRestoreAttempt((value) => value + 1)} />
   if (!user) return <LoginPage onLogin={login} onGoogleLogin={loginGoogle} />
   return <DashboardProvider user={user}><AppRoutes user={user} onLogout={logout} /></DashboardProvider>
 }

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { adminApi } from '../api/client'
 
 const DashboardContext = createContext(null)
@@ -15,6 +15,17 @@ async function fetchAllPages(fetchPage) {
   return items.concat(...remaining.map((page) => page?.items || []))
 }
 
+async function readCachedAllPages(readPage) {
+  const first = await readPage(1, 100)
+  if (first === undefined) return { found: false, items: [] }
+  const totalPages = Math.max(1, Number(first?.pagination?.totalPages) || 1)
+  const remaining = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) => readPage(index + 2, 100))
+  )
+  const pages = [first, ...remaining.filter((page) => page !== undefined)]
+  return { found: true, items: pages.flatMap((page) => page?.items || []) }
+}
+
 const emptyData = {
   dashboard: null,
   vendors: [],
@@ -29,12 +40,14 @@ export function DashboardProvider({ children, user }) {
   const [loadError, setLoadError] = useState('')
   const [data, setData] = useState(emptyData)
   const [toast, setToast] = useState(null)
+  const hasLoadedData = useRef(false)
 
   const showToast = useCallback((type, message) => setToast({ type, message }), [])
   const hideToast = useCallback(() => setToast(null), [])
 
   const loadData = useCallback(async (showSpinner = true) => {
-    if (showSpinner) setLoading(true)
+    const showInitialLoader = showSpinner && !hasLoadedData.current
+    if (showInitialLoader) setLoading(true)
     setLoadError('')
     try {
       if (!['super_admin', 'employee'].includes(user?.role)) {
@@ -42,6 +55,45 @@ export function DashboardProvider({ children, user }) {
         setDataReady(false)
         throw new Error('لا توجد صلاحية لعرض بيانات الإدارة.')
       }
+      if (!hasLoadedData.current) {
+        const cached = user?.role === 'employee'
+          ? await Promise.all([
+            readCachedAllPages((page, limit) => adminApi.cache.products(page, limit)),
+            readCachedAllPages((page, limit) => adminApi.cache.activeProducts(page, limit)),
+          ]).then(([products, activeProducts]) => ({
+            found: products.found || activeProducts.found,
+            dashboard: null,
+            vendors: [],
+            products: products.items,
+            activeProducts: activeProducts.items,
+            settlements: [],
+          }))
+          : await Promise.all([
+            adminApi.cache.dashboard(),
+            readCachedAllPages((page, limit) => adminApi.cache.vendors(page, limit)),
+            readCachedAllPages((page, limit) => adminApi.cache.products(page, limit)),
+            readCachedAllPages((page, limit) => adminApi.cache.activeProducts(page, limit)),
+            readCachedAllPages((page, limit) => adminApi.cache.settlements(page, limit)),
+          ]).then(([dashboard, vendors, products, activeProducts, settlements]) => ({
+            found: dashboard !== undefined || vendors.found || products.found || activeProducts.found || settlements.found,
+            dashboard: dashboard ?? null,
+            vendors: vendors.items,
+            products: products.items,
+            activeProducts: activeProducts.items,
+            settlements: settlements.items,
+          }))
+
+        if (cached.found) {
+          const cachedVendors = user?.role === 'employee'
+            ? [...new Map(cached.activeProducts.map((product) => [product.vendorId, { id: product.vendorId, companyName: product.vendorName }])).values()]
+            : cached.vendors
+          setData({ ...cached, vendors: cachedVendors })
+          setDataReady(true)
+          hasLoadedData.current = true
+          setLoading(false)
+        }
+      }
+
       const [dashboard, vendors, products, activeProducts, settlements] = user?.role === 'employee'
         ? await Promise.all([
           Promise.resolve(null),
@@ -62,12 +114,13 @@ export function DashboardProvider({ children, user }) {
         : vendors
       setData({ dashboard, vendors: productVendors, products, activeProducts, settlements })
       setDataReady(true)
+      hasLoadedData.current = true
       return true
     } catch (error) {
       setLoadError(error.message || 'تعذر تحميل بيانات لوحة الإدارة.')
       return false
     } finally {
-      if (showSpinner) setLoading(false)
+      if (showInitialLoader) setLoading(false)
     }
   }, [user?.role])
 

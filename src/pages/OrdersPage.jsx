@@ -127,7 +127,7 @@ function OrderDetails({ order, onClose, onUpdated }) {
     ].join('\n')
     try {
       await navigator.clipboard.writeText(text)
-      showToast('success', 'نُسخت تفاصيل الطلب؛ أرسلها للتاجر من قناة التواصل المناسبة.')
+      showToast('success', 'نُسخت تفاصيل الطلب.')
     } catch {
       showToast('error', 'تعذر النسخ تلقائيًا من هذا الجهاز.')
     }
@@ -146,17 +146,13 @@ function OrderDetails({ order, onClose, onUpdated }) {
         </header>
 
         <div className="overflow-y-auto p-5 sm:p-7">
-          <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
-            يمكن فتح WhatsApp برسالة شحن جاهزة للمراجعة؛ لن تُرسل الرسالة إلا بعد مراجعتها والضغط على الإرسال يدويًا.
-          </div>
-
           <div className="grid gap-4 md:grid-cols-2">
             <section className="card p-4">
               <h3 className="mb-3 font-bold text-neutral-900">العميل والتوصيل</h3>
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between gap-3"><dt className="text-neutral-500">الاسم</dt><dd className="text-left font-semibold text-neutral-800">{order.customer.name}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-neutral-500">الهاتف</dt><dd dir="ltr" className="text-left font-semibold text-neutral-800">{order.customer.phone || '—'}</dd></div>
-                {whatsappUrl && <div className="border-t border-neutral-100 pt-3"><a href={whatsappUrl} target="_blank" rel="noreferrer" className="btn-success w-full">فتح WhatsApp برسالة جاهزة</a><p className="mt-2 text-xs leading-5 text-neutral-500">يفتح الرابط محادثة برسالة جاهزة ولا يرسلها تلقائيًا.</p></div>}
+                {whatsappUrl && <div className="border-t border-neutral-100 pt-3"><a href={whatsappUrl} target="_blank" rel="noreferrer" className="btn-success w-full">فتح WhatsApp برسالة جاهزة</a></div>}
                 <div className="flex justify-between gap-3"><dt className="text-neutral-500">البريد</dt><dd className="break-all text-left text-neutral-800">{order.customer.email || '—'}</dd></div>
                 <div className="border-t border-neutral-100 pt-2 text-neutral-700">{[order.address.country, order.address.governorate, order.address.city, order.address.district, order.address.street, order.address.building, order.address.apartment, order.address.postalCode].filter(Boolean).join('، ') || 'لا يوجد عنوان محفوظ'}</div>
                 {order.address.notes && <p className="text-xs text-neutral-500">ملاحظة العنوان: {order.address.notes}</p>}
@@ -195,12 +191,11 @@ function OrderDetails({ order, onClose, onUpdated }) {
             <div className="mb-4 flex items-center gap-2"><Truck size={18} className="text-primary-600" /><h3 className="font-bold text-neutral-900">توجيه الطلب وتسجيل الشحن</h3></div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="حالة الطلب"><select className="input" value={status} onChange={(event) => changeOrderStatus(event.target.value)}>{statusOptions.filter(([value]) => (statusTransitions[order.status] || [order.status]).includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-              <Field label="شركة الشحن"><input className="input" value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="تُسجل يدويًا" maxLength={120} /></Field>
-              <Field label="رقم التتبع"><input className="input" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="إن توفر" maxLength={160} /></Field>
+              <Field label="شركة الشحن"><input className="input" value={carrier} onChange={(event) => setCarrier(event.target.value)} maxLength={120} /></Field>
+              <Field label="رقم التتبع"><input className="input" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} maxLength={160} /></Field>
               <Field label="حالة الشحنة"><select className="input" value={shipmentStatus} onChange={(event) => setShipmentStatus(event.target.value)}>{[['pending','بانتظار التجهيز'],['label_created','تم إنشاء بوليصة'],['ready','تم تجهيز الطرد'],['picked_up','استلمتها شركة الشحن'],['in_transit','في الطريق'],['delivered','تم التسليم'],['failed','تعذر التسليم'],['returned','مرتجع']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label={`رسوم الشحن (${order.totals.currency})`}><input className="input" type="number" min="0" step="0.01" value={shippingFee} onChange={(event) => setShippingFee(event.target.value)} /></Field>
             </div>
-            <p className="mt-3 text-xs leading-5 text-neutral-500">تجهيز الطرد من الإدارة. عند حفظ حالة «تم تجهيز الطرد» يرسل خادم الإدارة إشعار Push إلى العميل إذا كان جهازه مسجلًا ومفعّلًا. لا يوجد اتصال آلي بشركة الشحن؛ تُدخل بياناتها ورقم التتبع يدويًا.</p>
             <button type="button" onClick={save} disabled={saving} className="btn-primary mt-4 w-full sm:w-auto disabled:cursor-wait disabled:opacity-60">{saving ? <LoaderCircle size={16} className="animate-spin" /> : <Truck size={16} />}{saving ? 'جارٍ الحفظ...' : 'حفظ التوجيه والتحديث'}</button>
           </section>
         </div>
@@ -210,7 +205,7 @@ function OrderDetails({ order, onClose, onUpdated }) {
 }
 
 export default function OrdersPage() {
-  const { showToast, refresh, user } = useDashboard()
+  const { showToast, refresh } = useDashboard()
   const [orders, setOrders] = useState([])
   const [pagination, setPagination] = useState(null)
   const [page, setPage] = useState(1)
@@ -222,13 +217,20 @@ export default function OrdersPage() {
   const [detailLoading, setDetailLoading] = useState(false)
 
   const loadOrders = useCallback(async () => {
-    setLoading(true)
+    const cached = await adminApi.cache.orders(page, 50, status, query.trim(), shipmentStatusFilter)
+    if (cached !== undefined) {
+      setOrders(cached?.items || [])
+      setPagination(cached?.pagination || null)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     try {
       const result = await adminApi.orders(page, 50, status, query.trim(), shipmentStatusFilter)
       setOrders(result?.items || [])
       setPagination(result?.pagination || null)
     } catch (error) {
-      showToast('error', error.message || 'تعذر تحميل الطلبات.')
+      if (cached === undefined) showToast('error', error.message || 'تعذر تحميل الطلبات.')
     } finally {
       setLoading(false)
     }
@@ -237,12 +239,18 @@ export default function OrdersPage() {
   useEffect(() => { void loadOrders() }, [loadOrders])
 
   const openOrder = async (row) => {
-    setDetailLoading(true)
+    const cached = await adminApi.cache.order(row.vendorId, row.orderId)
+    if (cached !== undefined) {
+      setSelected(cached)
+      setDetailLoading(false)
+    } else {
+      setDetailLoading(true)
+    }
     try {
       const detail = await adminApi.order(row.vendorId, row.orderId)
       setSelected(detail)
     } catch (error) {
-      showToast('error', error.message || 'تعذر تحميل تفاصيل الطلب.')
+      if (cached === undefined) showToast('error', error.message || 'تعذر تحميل تفاصيل الطلب.')
     } finally {
       setDetailLoading(false)
     }
@@ -256,12 +264,8 @@ export default function OrdersPage() {
 
   return (
     <div dir="rtl" className="space-y-5">
-      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
-        <strong>نطاق العرض:</strong> {user?.role === 'employee' ? `تعرض هذه القائمة طلبات التجار في المحافظات المعيّنة لحسابك: ${user.assignedGovernorates.join('، ')}.` : 'تعرض هذه القائمة طلبات جميع التجار. صلاحيات الموظفين تُفرض من الخادم حسب محافظة التاجر.'}
-      </div>
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="text-xl font-bold text-neutral-900">طلبات المتجر</h2><p className="mt-1 text-sm text-neutral-500">افتح أي طلب لمراجعة تفاصيل العميل والتاجر وتسجيل شركة الشحن.</p></div>
+        <h2 className="text-xl font-bold text-neutral-900">طلبات المتجر</h2>
         <button type="button" onClick={loadOrders} className="btn-secondary" disabled={loading}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} />تحديث القائمة</button>
       </div>
 
@@ -270,10 +274,9 @@ export default function OrdersPage() {
         <select className="input sm:max-w-56" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="all">جميع الحالات</option>{statusOptions.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select aria-label="تصفية حسب حالة الشحنة" className="input sm:max-w-56" value={shipmentStatusFilter} onChange={(event) => { setPage(1); setShipmentStatusFilter(event.target.value) }}><option value="all">كل حالات الشحنة</option>{shipmentStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
       </div>
-      {shipmentStatusFilter === 'ready' && <p className="-mt-3 text-xs leading-5 text-neutral-500">يعرض هذا الاختيار الطرود التي اعتمدت الإدارة تجهيزها. رسالة WhatsApp الجاهزة تحتاج مراجعة وإرسالًا يدويًا.</p>}
 
       <section className="card overflow-hidden">
-        {loading ? <div className="flex items-center justify-center gap-3 p-12 text-sm text-neutral-500"><LoaderCircle size={18} className="animate-spin text-primary-600" />جارٍ تحميل الطلبات...</div> : orders.length === 0 ? <div className="p-12 text-center"><ShoppingBag size={34} className="mx-auto text-neutral-300" /><p className="mt-3 font-semibold text-neutral-700">لا توجد طلبات مطابقة</p><p className="mt-1 text-sm text-neutral-500">ستظهر طلبات المتجر الجديدة هنا بعد إتمام الشراء.</p></div> : (
+        {loading ? <div className="flex items-center justify-center gap-3 p-12 text-sm text-neutral-500"><LoaderCircle size={18} className="animate-spin text-primary-600" />جارٍ تحميل الطلبات...</div> : orders.length === 0 ? <div className="p-12 text-center"><ShoppingBag size={34} className="mx-auto text-neutral-300" /><p className="mt-3 font-semibold text-neutral-700">لا توجد طلبات مطابقة</p></div> : (
           <div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-right">
             <thead className="bg-neutral-50 text-xs text-neutral-500"><tr><th className="px-4 py-3 font-semibold">رقم الطلب</th><th className="px-4 py-3 font-semibold">العميل</th><th className="px-4 py-3 font-semibold">التاجر</th><th className="px-4 py-3 font-semibold">حالة الطلب</th><th className="px-4 py-3 font-semibold">حالة الشحنة</th><th className="px-4 py-3 font-semibold">الإجمالي</th><th className="px-4 py-3 font-semibold">التاريخ</th><th className="px-4 py-3 font-semibold">واتساب</th><th className="px-4 py-3 font-semibold">التفاصيل</th></tr></thead>
             <tbody className="divide-y divide-neutral-100">{orders.map((order) => {

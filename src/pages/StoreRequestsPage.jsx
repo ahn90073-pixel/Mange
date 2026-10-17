@@ -77,13 +77,19 @@ export default function StoreRequestsPage() {
   const nativeFileShareAvailable = nativePlatform && Capacitor.isPluginAvailable('Filesystem') && Capacitor.isPluginAvailable('Share')
 
   const loadRequests = useCallback(async () => {
-    setLoading(true)
+    const cached = await adminApi.cache.storeRequests(status, 1, 100)
+    if (cached !== undefined) {
+      setRequests(cached?.items || [])
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     setError('')
     try {
       const result = await adminApi.storeRequests(status, 1, 100)
       setRequests(result?.items || [])
     } catch (loadError) {
-      setError(loadError.message || 'تعذر تحميل طلبات المتاجر.')
+      if (cached === undefined) setError(loadError.message || 'تعذر تحميل طلبات المتاجر.')
     } finally {
       setLoading(false)
     }
@@ -167,7 +173,7 @@ export default function StoreRequestsPage() {
     const documents = request.documents || []
     if (!documents.length) return
     if (!nativeFileShareAvailable && typeof navigator.share !== 'function') {
-      setError(nativePlatform ? 'يلزم تثبيت إصدار التطبيق الجديد لتفعيل مشاركة الملفات.' : 'مشاركة الملفات غير مدعومة في هذا المتصفح. نزّل الملفات ثم أرفقها يدويًا في WhatsApp.')
+      setError(nativePlatform ? 'تتطلب مشاركة الملفات تحديث التطبيق.' : 'مشاركة الملفات غير مدعومة في هذا المتصفح.')
       return
     }
     setSharingId(request.id)
@@ -179,7 +185,7 @@ export default function StoreRequestsPage() {
         return new File([blob], `${document.documentType}.${extension}`, { type: document.contentType || blob.type })
       }))
       if (typeof navigator.canShare === 'function' && !navigator.canShare({ files })) {
-        throw new Error('الجهاز لا يدعم مشاركة هذه الملفات. نزّلها ثم أرفقها يدويًا في WhatsApp.')
+        throw new Error('الجهاز لا يدعم مشاركة هذه الملفات.')
       }
       setPendingShare({ requestId: request.id, title: `مستندات تسجيل ${request.storeName || 'المنشأة'}`, files })
     } catch (shareError) {
@@ -210,7 +216,7 @@ export default function StoreRequestsPage() {
   return (
     <div dir="rtl" className="w-full min-w-0 max-w-full space-y-5 overflow-x-hidden sm:space-y-6">
       <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div className="min-w-0"><h2 className="text-xl font-bold text-neutral-900">طلبات إنشاء متجر</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-500">تعرض هذه الصفحة ملف الشركة ومستنداته الخاصة. لا تُنشأ الشركة أو بيئتها المنفصلة إلا بعد اعتماد ملف مكتمل.</p></div>
+        <div className="min-w-0"><h2 className="text-xl font-bold text-neutral-900">طلبات إنشاء متجر</h2></div>
         <div className="flex w-full min-w-0 gap-2 sm:w-auto">
           <select aria-label="حالة الطلب" className="input min-w-0 flex-1 text-base sm:w-44 sm:flex-none sm:text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="pending">قيد المراجعة</option><option value="all">كل الطلبات</option><option value="approved">المعتمدة</option><option value="rejected">المرفوضة</option>
@@ -266,12 +272,12 @@ export default function StoreRequestsPage() {
                 })}</div>}
               </section>
 
-              {documents.length > 0 && <div className="space-y-2 rounded-xl border border-sky-100 bg-sky-50 p-3"><button type="button" className="btn-secondary" disabled={sharingId === request.id} onClick={() => pendingShare?.requestId === request.id ? void confirmShare() : void shareRequestDocuments(request)}>{sharingId === request.id ? <LoaderCircle size={16} className="animate-spin" /> : <Share2 size={16} />}{pendingShare?.requestId === request.id ? 'فتح WhatsApp لمشاركة الملفات' : 'تجهيز المستندات للمشاركة'}</button><p className="text-xs leading-5 text-sky-900">اضغط للتجهيز، ثم اضغط مرة أخرى لفتح شاشة المشاركة. اختر WhatsApp والمحادثة المقصودة، ولن ترسل الملفات إلا عند تأكيدك الإرسال.</p></div>}
+              {documents.length > 0 && <div className="rounded-xl border border-sky-100 bg-sky-50 p-3"><button type="button" className="btn-secondary" disabled={sharingId === request.id} onClick={() => pendingShare?.requestId === request.id ? void confirmShare() : void shareRequestDocuments(request)}>{sharingId === request.id ? <LoaderCircle size={16} className="animate-spin" /> : <Share2 size={16} />}{pendingShare?.requestId === request.id ? 'فتح WhatsApp لمشاركة الملفات' : 'تجهيز المستندات للمشاركة'}</button></div>}
 
-              {request.status === 'pending' && missing.length > 0 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">الطلب قديم أو غير مكتمل، ولا يمكن إنشاء المتجر قبل استكمال: {missing.join('، ')}. يظل الاعتماد محميًا في الخادم أيضًا.</p>}
+              {request.status === 'pending' && missing.length > 0 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">بيانات ناقصة: {missing.join('، ')}</p>}
               {request.adminNote && <p className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">ملاحظة الإدارة السابقة: {request.adminNote}</p>}
               {request.status === 'pending' && <div className="flex min-w-0 flex-col gap-3 border-t border-neutral-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
-                <label className="min-w-0 flex-1 space-y-1.5"><span className="text-xs font-semibold text-neutral-600">ملاحظة الرفض (اختيارية)</span><input className="input min-w-0 text-base sm:text-sm" maxLength={1000} value={notes[request.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="اكتب سببًا لمساعدة التاجر على تصحيح الطلب" /></label>
+                <label className="min-w-0 flex-1 space-y-1.5"><span className="text-xs font-semibold text-neutral-600">ملاحظة الرفض (اختيارية)</span><input className="input min-w-0 text-base sm:text-sm" maxLength={1000} value={notes[request.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [request.id]: event.target.value }))} /></label>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" disabled={isBusy} onClick={() => void decide(request, 'reject')} className="btn-secondary text-rose-700 disabled:opacity-50">{isBusy ? <LoaderCircle size={16} className="animate-spin" /> : <X size={16} />}رفض الطلب</button>
                   <button type="button" disabled={isBusy || missing.length > 0} title={missing.length ? `الملف ناقص: ${missing.join('، ')}` : ''} onClick={() => void decide(request, 'approve')} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />}اعتماد وإنشاء المتجر</button>
