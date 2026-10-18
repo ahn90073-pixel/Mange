@@ -5,6 +5,8 @@ import {
   Phone,
   MapPin,
   Calendar,
+  ExternalLink,
+  Share2,
   Store,
   Package,
   ShoppingCart,
@@ -54,6 +56,17 @@ export default function VendorDetailPage() {
   const netBalance = calculateNetBalance(vendor)
   const status = vendorStatusMap[vendor.status] || { label: vendor.status || 'غير محدد', class: 'badge-neutral' }
   const vendorSettlements = settlements.filter((s) => s.vendorId === vendor.id)
+  const location = vendor.shippingLocation
+  const mapUrl = location ? `https://www.google.com/maps?q=${encodeURIComponent(`${location.latitude},${location.longitude}`)}` : ''
+  const shareLocation = async (recipient) => {
+    if (!location) return
+    const message = `موقع متجر ${vendor.companyName} للتنسيق بشأن الشحن مع ${recipient}: ${mapUrl}`
+    try {
+      if (navigator.share) await navigator.share({ title: `موقع متجر ${vendor.companyName}`, text: message, url: mapUrl })
+      else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(message); window.alert('تم نسخ رسالة الموقع. أرسلها إلى شركة الشحن أو المندوب.'); }
+      else window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
+    } catch (error) { if (error?.name !== 'AbortError') window.alert('تعذرت مشاركة الموقع من هذا الجهاز. افتح رابط الخريطة وانسخه يدويًا.') }
+  }
 
   const financialCards = [
     {
@@ -169,6 +182,27 @@ export default function VendorDetailPage() {
           </div>
         </div>
       </div>
+
+      {location && (
+        <section className="card p-5 sm:p-6" aria-label="موقع المتجر للشحن">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700"><MapPin size={21} /></div>
+              <div>
+                <h3 className="font-bold text-neutral-900">موقع المتجر</h3>
+                <p className="mt-1 text-sm text-neutral-600">تمت مشاركته بإذن التاجر لتسهيل وصول الشحنات.</p>
+                <p dir="ltr" className="mt-1 text-xs text-neutral-500">{Number(location.latitude).toFixed(6)}, {Number(location.longitude).toFixed(6)}</p>
+                {location.sharedAt && <p className="mt-1 text-xs text-neutral-400">تاريخ الإذن: {formatDate(location.sharedAt)}</p>}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href={mapUrl} target="_blank" rel="noreferrer" className="btn-secondary"><ExternalLink size={16} /> فتح الخريطة</a>
+              <button type="button" onClick={() => shareLocation('شركة الشحن')} className="btn-primary"><Share2 size={16} /> مشاركة مع شركة الشحن</button>
+              <button type="button" onClick={() => shareLocation('مندوب الشحن')} className="btn-secondary"><Share2 size={16} /> مشاركة مع المندوب</button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Financial overview */}
       <div>
