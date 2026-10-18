@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -31,9 +32,10 @@ import PendingProductsPage from './PendingProductsPage'
 import VendorArchiveAction from '../components/vendors/VendorArchiveAction'
 
 export default function VendorDetailPage() {
+  const [reportBusy, setReportBusy] = useState(false)
   const { id } = useParams()
   const navigate = useNavigate()
-  const { vendors, settlements, updateVendorStatus, updateVendorGovernorate, user } = useDashboard()
+  const { vendors, settlements, updateVendorStatus, updateVendorGovernorate, refresh, showToast, user } = useDashboard()
   const isSuperAdmin = user?.role === 'super_admin'
 
   const vendor = vendors.find((v) => v.id === id)
@@ -58,6 +60,17 @@ export default function VendorDetailPage() {
   const vendorSettlements = settlements.filter((s) => s.vendorId === vendor.id)
   const location = vendor.shippingLocation
   const mapUrl = location ? `https://www.google.com/maps?q=${encodeURIComponent(`${location.latitude},${location.longitude}`)}` : ''
+  const handleDownloadReport = async () => {
+    setReportBusy(true)
+    try {
+      const result = await generateVendorReportPDF(vendor, user)
+      showToast('success', result === 'shared' ? 'تم تجهيز التقرير. اختر حفظه أو تنزيله من نافذة المشاركة.' : 'تم تجهيز التقرير وبدء تنزيل ملف PDF.')
+    } catch (error) {
+      if (error?.name !== 'AbortError') showToast('error', error.message || 'تعذر تنزيل تقرير PDF. حاول مرة أخرى.')
+    } finally {
+      setReportBusy(false)
+    }
+  }
   const shareLocation = async (recipient) => {
     if (!location) return
     const message = `موقع متجر ${vendor.companyName} للتنسيق بشأن الشحن مع ${recipient}: ${mapUrl}`
@@ -128,11 +141,13 @@ export default function VendorDetailPage() {
             </div>
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={() => generateVendorReportPDF(vendor, user)}
-                className="btn bg-white/15 text-white hover:bg-white/25 backdrop-blur"
+                type="button"
+                onClick={() => void handleDownloadReport()}
+                disabled={reportBusy}
+                className="btn bg-white/15 text-white hover:bg-white/25 backdrop-blur disabled:cursor-wait disabled:opacity-60"
               >
                 <FileText size={16} />
-                تحميل التقرير PDF
+                {reportBusy ? 'جارٍ تجهيز التقرير...' : 'تحميل التقرير PDF'}
               </button>
               {isSuperAdmin && (
                 <VendorArchiveAction
@@ -146,7 +161,7 @@ export default function VendorDetailPage() {
         </div>
 
         {/* Contact info */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-neutral-100">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-px bg-neutral-100">
           <div className="bg-white p-4 flex items-center gap-3">
             <Mail size={18} className="text-neutral-400" />
             <div className="min-w-0">
@@ -180,29 +195,41 @@ export default function VendorDetailPage() {
               <p className="text-sm font-medium text-neutral-800">{formatDate(vendor.registeredAt)}</p>
             </div>
           </div>
+          <div className="bg-white p-4 flex items-center gap-3">
+            <MapPin size={18} className={location ? 'text-success-600' : 'text-neutral-400'} />
+            <div>
+              <p className="text-xs text-neutral-500">موقع المتجر</p>
+              <p className={`text-sm font-medium ${location ? 'text-success-700' : 'text-neutral-600'}`}>{location ? 'تمت المشاركة' : 'لم يشارك الموقع بعد'}</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {location && (
-        <section className="card p-5 sm:p-6" aria-label="موقع المتجر للشحن">
+      <section className="card p-5 sm:p-6" aria-label="موقع المتجر للشحن">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700"><MapPin size={21} /></div>
               <div>
                 <h3 className="font-bold text-neutral-900">موقع المتجر</h3>
-                <p className="mt-1 text-sm text-neutral-600">تمت مشاركته بإذن التاجر لتسهيل وصول الشحنات.</p>
-                <p dir="ltr" className="mt-1 text-xs text-neutral-500">{Number(location.latitude).toFixed(6)}, {Number(location.longitude).toFixed(6)}</p>
-                {location.sharedAt && <p className="mt-1 text-xs text-neutral-400">تاريخ الإذن: {formatDate(location.sharedAt)}</p>}
+                {location ? <>
+                  <p className="mt-1 text-sm text-neutral-600">تمت مشاركته بإذن التاجر لتسهيل وصول الشحنات.</p>
+                  <p dir="ltr" className="mt-1 text-xs text-neutral-500">{Number(location.latitude).toFixed(6)}, {Number(location.longitude).toFixed(6)}</p>
+                  {location.sharedAt && <p className="mt-1 text-xs text-neutral-400">تاريخ الإذن: {formatDate(location.sharedAt)}</p>}
+                </> : <>
+                  <p className="mt-1 text-sm font-semibold text-neutral-700">لم يشارك التاجر موقع المتجر بعد.</p>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-neutral-500">ليظهر الموقع هنا، يجب أن يحدّث التاجر تطبيقه إلى 1.2.1، ثم يضغط «السماح بموقع المتجر» ويوافق على إذن الجهاز. بعد ذلك حدّث بيانات الإدارة.</p>
+                </>}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <a href={mapUrl} target="_blank" rel="noreferrer" className="btn-secondary"><ExternalLink size={16} /> فتح الخريطة</a>
-              <button type="button" onClick={() => shareLocation('شركة الشحن')} className="btn-primary"><Share2 size={16} /> مشاركة مع شركة الشحن</button>
-              <button type="button" onClick={() => shareLocation('مندوب الشحن')} className="btn-secondary"><Share2 size={16} /> مشاركة مع المندوب</button>
+              {location ? <>
+                <a href={mapUrl} target="_blank" rel="noreferrer" className="btn-secondary"><ExternalLink size={16} /> فتح الخريطة</a>
+                <button type="button" onClick={() => shareLocation('شركة الشحن')} className="btn-primary"><Share2 size={16} /> مشاركة مع شركة الشحن</button>
+                <button type="button" onClick={() => shareLocation('مندوب الشحن')} className="btn-secondary"><Share2 size={16} /> مشاركة مع المندوب</button>
+              </> : <button type="button" onClick={() => void refresh()} className="btn-secondary">تحديث حالة الموقع</button>}
             </div>
           </div>
-        </section>
-      )}
+      </section>
 
       {/* Financial overview */}
       <div>

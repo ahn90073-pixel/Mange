@@ -1,6 +1,60 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { Capacitor } from '@capacitor/core'
+import { Directory, Filesystem } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 import { calculateCommission, calculateNetBalance, formatCurrency, formatDate } from './format'
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error || new Error('تعذر قراءة ملف PDF.'))
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '')
+      const separator = dataUrl.indexOf(',')
+      if (separator < 0) reject(new Error('تعذر تجهيز ملف PDF للحفظ.'))
+      else resolve(dataUrl.slice(separator + 1))
+    }
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function exportPdf(doc, filename, title) {
+  const blob = doc.output('blob')
+  if (!(blob instanceof Blob) || blob.size === 0 || (await blob.slice(0, 5).text()) !== '%PDF-') {
+    throw new Error('تعذر إنشاء ملف التقرير PDF.')
+  }
+
+  if (Capacitor.isNativePlatform()) {
+    const capability = await Share.canShare()
+    if (!capability.value) throw new Error('مشاركة ملفات PDF غير متاحة في هذا الإصدار من التطبيق.')
+    const path = `reports/${filename}`
+    const savedFile = await Filesystem.writeFile({
+      path,
+      data: await blobToBase64(blob),
+      directory: Directory.Cache,
+      recursive: true,
+    })
+    const saved = await Filesystem.readFile({ path, directory: Directory.Cache })
+    const savedBase64 = String(saved.data || '').replace(/^data:[^,]+,/, '')
+    if (!atob(savedBase64.slice(0, 24)).startsWith('%PDF-')) {
+      throw new Error('تعذر التحقق من ملف التقرير المحفوظ على الهاتف.')
+    }
+    await Share.share({ title, text: title, files: [savedFile.uri], dialogTitle: title })
+    return 'shared'
+  }
+
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+  return 'downloaded'
+}
 
 function getAdminInfo(user) {
   const adminName = user?.fullName || user?.email || 'مدير المنصة'
@@ -148,7 +202,7 @@ export function generatePaymentVoucherPDF(settlement, vendor, user) {
 }
 
 // Generate a vendor financial report PDF
-export function generateVendorReportPDF(vendor, user) {
+export async function generateVendorReportPDF(vendor, user) {
   const adminInfo = getAdminInfo(user)
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -180,6 +234,9 @@ export function generateVendorReportPDF(vendor, user) {
     ['Email / البريد', vendor.email],
     ['Phone / الهاتف', vendor.phone],
     ['City / المدينة', vendor.city],
+    ['Shipping Location / موقع الشحن', vendor.shippingLocation
+      ? `${Number(vendor.shippingLocation.latitude).toFixed(6)}, ${Number(vendor.shippingLocation.longitude).toFixed(6)}`
+      : 'Not shared / لم يشارك بعد'],
     ['Status / الحالة', vendor.status],
     ['Registered / تاريخ التسجيل', formatDate(vendor.registeredAt)],
   ]
@@ -264,5 +321,6 @@ export function generateVendorReportPDF(vendor, user) {
     { align: 'center' }
   )
 
-  doc.save(`Vendor-Report-${vendor.id}.pdf`)
+  const filename = `Vendor-Report-${vendor.id}.pdf`
+  return exportPdf(doc, filename, `تقرير مالي للتاجر ${vendor.companyName || vendor.id}`)
 }
