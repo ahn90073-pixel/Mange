@@ -26,6 +26,7 @@ const pageMeta = {
   },
   '/employees': { title: 'إدارة الموظفين', subtitle: 'حسابات الموظفين وصلاحيات المحافظات' },
   '/notifications': { title: 'مركز الإشعارات', subtitle: 'حملات Firebase للعملاء والتجار المفعّلين' },
+  '/promotions': { title: 'البنرات الترويجية', subtitle: 'إنشاء وإدارة العروض الظاهرة في واجهة المنصة' },
 }
 
 export default function Layout({ children, user, onLogout }) {

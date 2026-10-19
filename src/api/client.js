@@ -4,6 +4,7 @@ import { cacheAdminDocument, readCachedAdminDocument } from '../lib/adminDocumen
 
 const DEFAULT_API_BASE = 'https://mangerbackend.ahn90073.workers.dev/api/admin'
 const API_BASE = (import.meta.env.VITE_ADMIN_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
+const STOREFRONT_API_BASE = 'https://tagerbackend.ahn90073.workers.dev/api/storefront'
 const TOKEN_KEY = 'mange-admin-session-token'
 
 const localizedErrors = {
@@ -86,7 +87,8 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 25000)
   const headers = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   const token = auth ? getSessionToken() : ''
   if (token) headers.Authorization = `Bearer ${token}`
 
@@ -94,7 +96,7 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     const response = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
       signal: controller.signal,
     })
     const payload = await response.json().catch(() => null)
@@ -114,6 +116,95 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     if (cacheable && cached !== undefined) return cached
     if (error?.name === 'AbortError') throw new ApiError('انتهت مهلة الاتصال بخادم الإدارة. حاول مرة أخرى.')
     throw new ApiError('تعذر الاتصال بخادم الإدارة. تحقق من الإنترنت وإعدادات CORS.')
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+async function storefrontRequest(path, { method = 'GET', body } = {}) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 25000)
+  const headers = { Accept: 'application/json' }
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const token = getSessionToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  try {
+    const response = await fetch(`${STOREFRONT_API_BASE}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || payload?.success === false) {
+      if (response.status === 401 && token) {
+        setSessionToken('')
+        window.dispatchEvent(new Event('mange:auth-expired'))
+      }
+      throw new ApiError(apiMessage(payload, response.status), response.status)
+    }
+    return payload?.data ?? payload
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (error?.name === 'AbortError') throw new ApiError('انتهت مهلة الاتصال بخادم الوسائط. حاول مرة أخرى.')
+    throw new ApiError('تعذر الاتصال بخادم الوسائط. تحقق من الإنترنت وإعدادات CORS.')
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+async function uploadPromotionMedia(file) {
+  const signature = await storefrontRequest('/admin/promotions/upload-signature', {
+    method: 'POST',
+    body: { contentType: file.type },
+  })
+  const { cloudName, apiKey, timestamp, signature: uploadSignature, assetFolder, publicId, resourceType } = signature || {}
+  if (!cloudName || !apiKey || !timestamp || !uploadSignature || !assetFolder || !publicId || !['image', 'video'].includes(resourceType)) {
+    throw new ApiError('استجابة توقيع رفع الوسائط غير مكتملة.')
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('api_key', apiKey)
+  formData.append('timestamp', String(timestamp))
+  formData.append('signature', uploadSignature)
+  formData.append('asset_folder', assetFolder)
+  formData.append('public_id', publicId)
+
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 120000)
+  try {
+    // Do not set Content-Type here: the browser must add the multipart boundary.
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${resourceType}/upload`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    })
+    const result = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new ApiError(result?.error?.message || 'تعذر رفع الوسيط إلى Cloudinary.', response.status)
+    }
+    const secureUrl = result?.secure_url
+    const returnedPublicId = result?.public_id
+    let parsedUrl
+    try {
+      parsedUrl = new URL(secureUrl)
+    } catch {
+      parsedUrl = null
+    }
+    if (!secureUrl || !returnedPublicId || parsedUrl?.protocol !== 'https:' || parsedUrl.hostname !== 'res.cloudinary.com') {
+      throw new ApiError('استجابة Cloudinary لا تحتوي على رابط وسيط آمن صالح.')
+    }
+    return {
+      mediaUrl: secureUrl,
+      mediaKey: returnedPublicId,
+      mediaType: resourceType === 'video' ? 'video' : 'image',
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (error?.name === 'AbortError') throw new ApiError('انتهت مهلة رفع الوسيط. حاول باستخدام ملف أصغر أو أعد المحاولة.')
+    throw new ApiError('تعذر رفع الوسيط إلى Cloudinary. تحقق من الاتصال ثم أعد المحاولة.')
   } finally {
     window.clearTimeout(timeout)
   }
@@ -139,6 +230,7 @@ const apiPaths = {
   notificationStatus: () => '/notifications/status',
   notificationContacts: (audience = '', page = 1, limit = 50) => `/notifications/contacts${pageQuery(page, limit, audience ? { audience } : {})}`,
   shipmentActivationRequests: (status = 'all', limit = 50) => `/notifications/shipment-requests${pageQuery(1, limit, { status })}`,
+  promotions: () => '/promotions',
 }
 
 const cached = (path) => readAdminApiCache(path)
@@ -159,6 +251,7 @@ export const adminApi = {
     notificationStatus: () => cached(apiPaths.notificationStatus()),
     notificationContacts: (audience = '', page = 1, limit = 50) => cached(apiPaths.notificationContacts(audience, page, limit)),
     shipmentActivationRequests: (status = 'all', limit = 50) => cached(apiPaths.shipmentActivationRequests(status, limit)),
+    promotions: () => cached(apiPaths.promotions()),
   },
   login: (credentials) => request('/auth/login', { method: 'POST', body: credentials, auth: false }),
   googleLogin: (idToken) => request('/auth/google', { method: 'POST', body: { idToken }, auth: false }),
@@ -168,6 +261,15 @@ export const adminApi = {
   notificationContacts: (audience = '', page = 1, limit = 50) => request(`/notifications/contacts${pageQuery(page, limit, audience ? { audience } : {})}`),
   shipmentActivationRequests: (status = 'all', limit = 50) => request(`/notifications/shipment-requests${pageQuery(1, limit, { status })}`),
   sendNotification: (campaign) => request('/notifications/send', { method: 'POST', body: campaign }),
+  promotions: () => request(apiPaths.promotions()),
+  uploadPromotionMedia,
+  deletePromotionMedia: (publicId, mediaType) => storefrontRequest('/admin/promotions/delete-media', {
+    method: 'POST',
+    body: { publicId, mediaType },
+  }),
+  createPromotion: (promotion) => request(apiPaths.promotions(), { method: 'POST', body: promotion }),
+  updatePromotion: (id, promotion) => request(`/promotions/${encodeURIComponent(id)}`, { method: 'PATCH', body: promotion }),
+  deletePromotion: (id) => request(`/promotions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   employees: () => request('/employees'),
   storeRequests: (status = 'pending', page = 1, limit = 100) => request(`/store-requests${pageQuery(page, limit, { status })}`),
   storeRequestDocument: async (id, documentType) => {

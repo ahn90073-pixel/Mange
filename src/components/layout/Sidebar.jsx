@@ -10,6 +10,7 @@ import {
   Users,
   ClipboardCheck,
   BellRing,
+  Megaphone,
   Package,
   X,
 } from 'lucide-react'
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/settlements', label: 'السدادات المالية', icon: Receipt, superAdminOnly: true },
   { to: '/employees', label: 'إدارة الموظفين', icon: Users, superAdminOnly: true },
   { to: '/notifications', label: 'مركز الإشعارات', icon: BellRing, superAdminOnly: true },
+  { to: '/promotions', label: 'البنرات الترويجية', icon: Megaphone, superAdminOnly: true },
 ]
 
 export default function Sidebar({ open, onClose, user }) {
