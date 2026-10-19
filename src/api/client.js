@@ -215,6 +215,57 @@ function pageQuery(page, limit = 100, extra = {}) {
   return `?${query.toString()}`
 }
 
+async function uploadNotificationImage(file) {
+  const signature = await storefrontRequest('/admin/notifications/upload-signature', {
+    method: 'POST',
+    body: { contentType: file.type },
+  })
+  const { cloudName, apiKey, timestamp, signature: uploadSignature, assetFolder, publicId, resourceType } = signature || {}
+  if (!cloudName || !apiKey || !timestamp || !uploadSignature || !assetFolder || !publicId || resourceType !== 'image') {
+    throw new ApiError('استجابة توقيع رفع صورة الإشعار غير مكتملة.')
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('api_key', apiKey)
+  formData.append('timestamp', String(timestamp))
+  formData.append('signature', uploadSignature)
+  formData.append('asset_folder', assetFolder)
+  formData.append('public_id', publicId)
+
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 120000)
+  try {
+    // Do not set Content-Type here: the browser must add the multipart boundary.
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    })
+    const result = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new ApiError(result?.error?.message || 'تعذر رفع صورة الإشعار إلى Cloudinary.', response.status)
+    }
+    const secureUrl = result?.secure_url
+    let parsedUrl
+    try {
+      parsedUrl = new URL(secureUrl)
+    } catch {
+      parsedUrl = null
+    }
+    if (!secureUrl || parsedUrl?.protocol !== 'https:' || parsedUrl.hostname !== 'res.cloudinary.com') {
+      throw new ApiError('استجابة Cloudinary لا تحتوي على رابط صورة آمن صالح.')
+    }
+    return secureUrl
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (error?.name === 'AbortError') throw new ApiError('انتهت مهلة رفع صورة الإشعار. حاول باستخدام ملف أصغر أو أعد المحاولة.')
+    throw new ApiError('تعذر رفع صورة الإشعار إلى Cloudinary. تحقق من الاتصال ثم أعد المحاولة.')
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
 const apiPaths = {
   me: () => '/auth/me',
   dashboard: () => '/dashboard',
@@ -261,6 +312,7 @@ export const adminApi = {
   notificationContacts: (audience = '', page = 1, limit = 50) => request(`/notifications/contacts${pageQuery(page, limit, audience ? { audience } : {})}`),
   shipmentActivationRequests: (status = 'all', limit = 50) => request(`/notifications/shipment-requests${pageQuery(1, limit, { status })}`),
   sendNotification: (campaign) => request('/notifications/send', { method: 'POST', body: campaign }),
+  uploadNotificationImage,
   promotions: () => request(apiPaths.promotions()),
   uploadPromotionMedia,
   deletePromotionMedia: (publicId, mediaType) => storefrontRequest('/admin/promotions/delete-media', {

@@ -3,6 +3,7 @@ import { BellRing, Image, LoaderCircle, MessageCircle, PackageCheck, RefreshCw, 
 import { useSearchParams } from 'react-router-dom'
 import { adminApi } from '../api/client'
 import { useDashboard } from '../context/DashboardContext'
+import { EGYPT_GOVERNORATES } from '../data/egyptGovernorates'
 import { shipmentWhatsAppUrl } from '../utils/shipmentWhatsApp'
 
 const audienceLabels = { customer: 'العملاء', merchant: 'التجار' }
@@ -26,17 +27,23 @@ function contactWhatsAppUrl(phoneValue, title, messageBody) {
   return `https://wa.me/${phone}${text ? `?text=${encodeURIComponent(text)}` : ''}`
 }
 
+function governorateValue(entry) {
+  if (typeof entry === 'string') return entry
+  return entry?.governorate || entry?.name || ''
+}
+
 export default function NotificationsPage() {
   const { vendors, showToast } = useDashboard()
   const [searchParams] = useSearchParams()
   const [audience, setAudience] = useState('customer')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
-  const [imageData, setImageData] = useState('')
+  const [imageFile, setImageFile] = useState(null)
   const [imageName, setImageName] = useState('')
   const [imagePreview, setImagePreview] = useState('')
   const [companyId, setCompanyId] = useState('')
   const [targetTokenRef, setTargetTokenRef] = useState('')
+  const [governorate, setGovernorate] = useState('')
   const [status, setStatus] = useState(null)
   const [contacts, setContacts] = useState([])
   const [shipmentRequests, setShipmentRequests] = useState([])
@@ -75,15 +82,26 @@ export default function NotificationsPage() {
   useEffect(() => { void load() }, [load])
 
   const audienceStats = status?.audiences?.[audience] || { readyToSend: 0, optedIn: 0, total: 0 }
-  const customerCities = audience === 'customer' && Array.isArray(status?.customerCities) ? status.customerCities : []
+  const customerGovernorates = audience === 'customer' && Array.isArray(status?.customerGovernorates) ? status.customerGovernorates : []
   const configured = Boolean(status?.configured?.[audience])
   const selectedStore = useMemo(() => vendors.find((vendor) => vendor.id === companyId), [companyId, vendors])
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview('')
+      return undefined
+    }
+    const previewUrl = URL.createObjectURL(imageFile)
+    setImagePreview(previewUrl)
+    return () => URL.revokeObjectURL(previewUrl)
+  }, [imageFile])
 
   useEffect(() => {
     const requestedAudience = searchParams.get('audience')
     if (audienceLabels[requestedAudience]) {
       setAudience(requestedAudience)
       if (requestedAudience === 'customer') { setCompanyId(''); setTargetTokenRef('') }
+      else setGovernorate('')
     }
   }, [searchParams])
 
@@ -92,13 +110,15 @@ export default function NotificationsPage() {
     setSending(true)
     setResult(null)
     try {
+      const imageUrl = imageFile ? await adminApi.uploadNotificationImage(imageFile) : ''
       const response = await adminApi.sendNotification({
         audience,
         title: title.trim(),
         body: body.trim(),
-        ...(imageData ? { imageData, imageName } : {}),
+        ...(imageUrl ? { imageUrl } : {}),
         ...(companyId ? { companyId } : {}),
         ...(audience === 'customer' && targetTokenRef ? { targetTokenRef } : {}),
+        ...(audience === 'customer' && governorate ? { governorate } : {}),
       })
       setResult(response)
       showToast('success', 'تم تنفيذ حملة الإشعار.')
@@ -171,17 +191,12 @@ export default function NotificationsPage() {
       event.target.value = ''
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => {
-      setImageData(String(reader.result || ''))
-      setImageName(file.name)
-      setImagePreview(String(reader.result || ''))
-    }
-    reader.readAsDataURL(file)
+    setImageFile(file)
+    setImageName(file.name)
   }
 
   const clearImage = () => {
-    setImageData('')
+    setImageFile(null)
     setImageName('')
     setImagePreview('')
   }
@@ -203,18 +218,24 @@ export default function NotificationsPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <section className="card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-neutral-500">جهات {audienceLabels[audience]}</p>{audience === 'customer' && <span className="text-[11px] font-semibold text-neutral-400">المدن التقريبية</span>}</div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-neutral-500">جهات {audienceLabels[audience]}</p>{audience === 'customer' && <span className="text-[11px] font-semibold text-neutral-400">المحافظات المسجلة</span>}</div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
             <p className="text-2xl font-bold text-neutral-900">{audienceStats.total}</p>
-            {audience === 'customer' && <div aria-label="المدن التقريبية لتوكنات الجمهور" className="flex flex-wrap gap-1.5">
-              {customerCities.length ? customerCities.slice(0, 4).map((city) => <span key={`${city.city}-${city.region}-${city.country}`} title={[city.region, city.country].filter(Boolean).join('، ')} className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-800">{city.city} <bdi dir="ltr" className="mr-1 text-primary-600">{city.tokens}</bdi></span>) : <span className="text-xs text-neutral-400">لا توجد مدن مسجلة بعد</span>}
-              {customerCities.length > 4 && <span className="self-center text-xs text-neutral-500">+{customerCities.length - 4} مدن</span>}
+            {audience === 'customer' && <div aria-label="المحافظات المسجلة لأجهزة الجمهور" className="mt-2 flex flex-wrap gap-1.5">
+              {customerGovernorates.length === 0 && <span className="text-xs text-neutral-400">تُسجَّل المحافظة عند إتمام طلب بعنوان شحن.</span>}
+              {customerGovernorates.slice(0, 4).map((entry, index) => {
+                const label = governorateValue(entry)
+                if (!label) return null
+                const tokens = typeof entry === 'object' ? entry.tokens : null
+                return <span key={`${label}-${index}`} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">{label}{tokens !== null && tokens !== undefined ? <bdi dir="ltr" className="mr-1 text-amber-700">{tokens}</bdi> : null}</span>
+              })}
+              {customerGovernorates.length > 4 && <span className="self-center text-xs text-neutral-500">+{customerGovernorates.length - 4} محافظات</span>}
             </div>}
           </div>
           <p className="mt-1 text-xs text-neutral-500">المفعّل منهم: {audienceStats.optedIn}</p>
         </section>
         <section className="card p-4"><p className="text-xs text-neutral-500">مستلمون جاهزون</p><p className="mt-2 text-2xl font-bold text-primary-700">{audienceStats.readyToSend}</p></section>
-        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? (targetTokenRef ? (contacts.find((contact) => contact.tokenRef === targetTokenRef)?.name || 'عميل محدد') : 'كل العملاء') : (selectedStore?.companyName || 'كل التجار')}</p></section>
+        <section className="card p-4"><p className="text-xs text-neutral-500">نطاق الحملة</p><p className="mt-2 font-bold text-neutral-900">{audience === 'customer' ? (targetTokenRef ? `${contacts.find((contact) => contact.tokenRef === targetTokenRef)?.name || 'عميل محدد'}${governorate ? ` — ${governorate}` : ''}` : (governorate ? `عملاء محافظة ${governorate}` : 'كل العملاء')) : (selectedStore?.companyName || 'كل التجار')}</p></section>
       </div>
 
       <section className="card overflow-hidden">
@@ -256,10 +277,10 @@ export default function NotificationsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div role="group" aria-label="اختيار جمهور الإشعارات" className="grid grid-cols-2 gap-2 sm:col-span-2">
               <button type="button" aria-pressed={audience === 'customer'} onClick={() => { setAudience('customer'); setCompanyId('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'customer' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات الجمهور</button>
-              <button type="button" aria-pressed={audience === 'merchant'} onClick={() => { setAudience('merchant'); setTargetTokenRef('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'merchant' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات التجار</button>
+              <button type="button" aria-pressed={audience === 'merchant'} onClick={() => { setAudience('merchant'); setTargetTokenRef(''); setGovernorate('') }} className={`rounded-xl border px-4 py-3 text-sm font-bold transition ${audience === 'merchant' ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}>إشعارات التجار</button>
             </div>
             {audience === 'merchant' && <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">التاجر (اختياري)</span><select className="input" value={companyId} onChange={(event) => setCompanyId(event.target.value)}><option value="">كل التجار</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName || vendor.name || vendor.id}</option>)}</select></label>}
-            {audience === 'customer' && <div className="space-y-2 sm:col-span-2"><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">عميل محدد (اختياري)</span><select className="input" value={targetTokenRef} onChange={(event) => setTargetTokenRef(event.target.value)}><option value="">كل العملاء</option>{contacts.filter((contact) => contact.tokenRef).map((contact, index) => <option key={`${contact.tokenRef}-${index}`} value={contact.tokenRef}>{contact.name} — {contact.locationCity || 'مدينة غير محددة'} — {contact.whatsappPhone}</option>)}</select></label>{targetTokenRef && (() => { const selected = contacts.find((contact) => contact.tokenRef === targetTokenRef); return selected ? <div className="grid gap-2 rounded-xl border border-primary-100 bg-primary-50 p-3 text-sm sm:grid-cols-3"><p><span className="text-xs text-neutral-500">العميل</span><br /><b>{selected.name}</b></p><p><span className="text-xs text-neutral-500">المدينة</span><br /><b>{selected.locationCity || 'غير محددة'}</b><span className="block text-xs text-neutral-500">{[selected.locationRegion, selected.locationCountry].filter(Boolean).join('، ')}</span></p><p><span className="text-xs text-neutral-500">رقم واتساب</span><br /><bdi dir="ltr" className="font-medium">{selected.whatsappPhone}</bdi></p></div> : null })()}</div>}
+            {audience === 'customer' && <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2"><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">المحافظة (اختياري)</span><select className="input" value={governorate} onChange={(event) => setGovernorate(event.target.value)}><option value="">كل المحافظات</option>{EGYPT_GOVERNORATES.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</select></label><label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">عميل محدد (اختياري)</span><select className="input" value={targetTokenRef} onChange={(event) => setTargetTokenRef(event.target.value)}><option value="">كل العملاء</option>{contacts.filter((contact) => contact.tokenRef).map((contact, index) => <option key={`${contact.tokenRef}-${index}`} value={contact.tokenRef}>{contact.name} — {contact.governorate || 'محافظة غير محددة'} — {contact.whatsappPhone}</option>)}</select></label>{targetTokenRef && (() => { const selected = contacts.find((contact) => contact.tokenRef === targetTokenRef); return selected ? <div className="grid gap-2 rounded-xl border border-primary-100 bg-primary-50 p-3 text-sm sm:col-span-2 sm:grid-cols-3"><p><span className="text-xs text-neutral-500">العميل</span><br /><b>{selected.name}</b></p><p><span className="text-xs text-neutral-500">المحافظة</span><br /><b>{selected.governorate || 'غير محددة'}</b></p><p><span className="text-xs text-neutral-500">رقم واتساب</span><br /><bdi dir="ltr" className="font-medium">{selected.whatsappPhone}</bdi></p></div> : null })()}</div>}
           </div>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">العنوان <span className="font-normal text-neutral-400">(120 حرفًا)</span></span><input required maxLength={120} className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="عنوان الإشعار" /></label>
           <label className="block space-y-1.5"><span className="text-xs font-semibold text-neutral-600">النص <span className="font-normal text-neutral-400">(500 حرف)</span></span><textarea required maxLength={500} rows={4} className="input resize-y" value={body} onChange={(event) => setBody(event.target.value)} /></label>
@@ -289,7 +310,7 @@ export default function NotificationsPage() {
                   <th className="px-4 py-3">{audience === 'customer' ? 'اسم العميل' : 'اسم التاجر'}</th>
                   <th className="px-4 py-3">{audience === 'customer' ? 'العميل / المتجر' : 'اسم الشركة'}</th>
                   <th className="px-4 py-3">الهاتف</th>
-                  <th className="px-4 py-3">المدينة</th>
+                  <th className="px-4 py-3">{audience === 'customer' ? 'المحافظة' : 'المدينة'}</th>
                   <th className="px-4 py-3">المنصة / الإصدار</th>
                   <th className="px-4 py-3">آخر نشاط</th>
                   <th className="px-4 py-3">Push</th>
@@ -302,7 +323,7 @@ export default function NotificationsPage() {
                     <td className="px-4 py-3"><p className="font-semibold">{contact.name}</p></td>
                     <td className="px-4 py-3">{contact.companyName || contact.storeName || '—'}</td>
                     <td dir="ltr" className="px-4 py-3 text-left">{contact.whatsappPhone}</td>
-                    <td className="px-4 py-3 text-xs text-neutral-600">{contact.locationCity || 'غير محددة'}{contact.locationRegion ? <span className="block text-neutral-400">{contact.locationRegion}</span> : null}</td>
+                    <td className="px-4 py-3 text-xs text-neutral-600">{audience === 'customer' ? (contact.governorate || 'غير محددة') : <>{contact.locationCity || 'غير محددة'}{contact.locationRegion ? <span className="block text-neutral-400">{contact.locationRegion}</span> : null}</>}</td>
                     <td className="px-4 py-3">{contact.platform} / {contact.appVersion}</td>
                     <td className="px-4 py-3 text-xs text-neutral-600">{formatLastSeen(contact.lastSeenAt)}</td>
                     <td className="px-4 py-3">{contact.pushEnabled && contact.hasPushToken ? <span className="badge-success">مفعّل</span> : <span className="badge-neutral">غير جاهز</span>}</td>
