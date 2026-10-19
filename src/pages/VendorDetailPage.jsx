@@ -217,7 +217,6 @@ export default function VendorDetailPage() {
                   {location.sharedAt && <p className="mt-1 text-xs text-neutral-400">تاريخ الإذن: {formatDate(location.sharedAt)}</p>}
                 </> : <>
                   <p className="mt-1 text-sm font-semibold text-neutral-700">لم يشارك التاجر موقع المتجر بعد.</p>
-                  <p className="mt-1 max-w-2xl text-xs leading-5 text-neutral-500">ليظهر الموقع هنا، يجب أن يحدّث التاجر تطبيقه إلى 1.2.1، ثم يضغط «السماح بموقع المتجر» ويوافق على إذن الجهاز. بعد ذلك حدّث بيانات الإدارة.</p>
                 </>}
               </div>
             </div>
